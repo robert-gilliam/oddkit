@@ -59,6 +59,8 @@ Planned skills (not yet built):
 - [ ] `commit` — smart commit with good message from staged changes
 - [ ] `debug` — systematic debugging of a failing test or error
 - [ ] `cleanup` — find dead code, stale branches, unused files
+- [ ] `retro` — extract lessons from recently completed tasks, append reusable rules to CLAUDE.md with deduplication
+- [ ] `skill-converter` — import an external skill and rewrite it as an oddkit skill (minimal, concise, no ceremony or AI fluff)
 
 ## 8. Future-Proofing
 

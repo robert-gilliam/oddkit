@@ -36,3 +36,5 @@
 - **2026-03-26** [decision] — All 7 agents use opus. Sonnet only if cost becomes an issue.
 - **2026-03-26** [decision] — Plugin structure: skills/ (review, address-feedback), agents/ (7 shared), .claude-plugin/plugin.json (minimal).
 - **2026-03-26** [decision] — Future skills planned: create-pr, plan, implement, commit, debug, cleanup. Build as needed.
+- **2026-03-26** [concept] — `retro` skill: extracts lessons from recently completed in-context tasks, appends reusable rules to CLAUDE.md with deduplication. Closes the learning loop without manual note-taking.
+- **2026-03-26** [concept] — `skill-converter` skill: takes an external skill and translates it into an oddkit variant — stripped of ceremony, fluff, and overengineering. Enforces oddkit tenets during conversion.

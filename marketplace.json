@@ -1,0 +1,14 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "oddkit-marketplace",
+  "version": "1.0.0",
+  "description": "oddkit plugin marketplace",
+  "plugins": [
+    {
+      "name": "oddkit",
+      "description": "Compact workflow skills for Claude Code.",
+      "version": "0.1.0",
+      "source": "."
+    }
+  ]
+}
