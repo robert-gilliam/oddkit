@@ -21,7 +21,7 @@
 - **2026-03-26** [decision] — Target audience (today): senior devs with strong opinions, frustrated by AI tooling that's either too loose or too bureaucratic
 - **2026-03-26** [decision] — Voice: short, high info density, no fluff, no LLM cliches, feel human. Say the thing then stop.
 - **2026-03-26** [concept] — Core tenets: compact skills, lightweight guardrails, minimal code, less is more, human-readable, don't build what you don't need
-- **2026-03-26** [decision] — Branding: lightweight strategy brief written to brand/strategy.md. No full brand identity yet. Build first, brand catches up.
+- **2026-03-26** [decision] — Branding: lightweight strategy brief written to docs/brand/strategy.md. No full brand identity yet. Build first, brand catches up.
 - **2026-03-26** [decision] — "odd" stays as working direction, not commitment. Logo/visual identity all provisional.
 - **2026-03-26** [concept] — Plugin architecture research complete. Skills are the primary building block, agents for isolation/parallel work, hooks for automation.
 - **2026-03-26** [decision] — Drop "opinionated" from user-facing copy. The tools have conviction — show it through behavior, don't label it.
@@ -33,3 +33,6 @@
 - **2026-03-26** [decision] — Two autonomy levels only: confirm (default) and `--yolo`. No third level.
 - **2026-03-26** [decision] — `address-pr-feedback` stays separate. Same autonomy pattern: confirm default, `--yolo` to skip.
 - **2026-03-26** [decision] — All GitHub actions (post comments, push code) show summary and confirm before executing, unless `--yolo`.
+- **2026-03-26** [decision] — All 7 agents use opus. Sonnet only if cost becomes an issue.
+- **2026-03-26** [decision] — Plugin structure: skills/ (review, address-feedback), agents/ (7 shared), .claude-plugin/plugin.json (minimal).
+- **2026-03-26** [decision] — Future skills planned: create-pr, plan, implement, commit, debug, cleanup. Build as needed.
