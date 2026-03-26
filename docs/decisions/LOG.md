@@ -1,0 +1,25 @@
+# Decision Log
+
+- **2026-03-26** — Core problem: packaging scattered personal workflow skills into a portable, shareable collection (not just PR reviews)
+- **2026-03-26** — Audience: start personal, grow toward public distribution over time
+- **2026-03-26** — oddkit is a skill collection plugin, not a single-purpose PR review tool
+- **2026-03-26** — Created a lightweight project skill (`decision-log`) to track design decisions as we iterate
+- **2026-03-26** — Working mission: "A growing toolkit of opinionated workflow skills for Claude Code." (may revisit wording)
+- **2026-03-26** — Name "oddkit" leaning keep, open to alternatives
+- **2026-03-26** — "Opinionated" = skills make choices for you rather than exposing lots of config. TBD on how to articulate this.
+- **2026-03-26** [concept] — The "oddness" isn't random quirk — it's having conviction to say "this is the way" when everyone else hedges with config and docs
+- **2026-03-26** [concept] — oddkit rejects both extremes in AI-dev tooling: max configurability (47 knobs) and max documentation (30-page guides). It's "I figured out the good way, just use it."
+- **2026-03-26** [concept] — Floating eyeball with wings as logo concept — watchful, uncanny, moves freely, sees things others don't
+- **2026-03-26** [concept] — Anti-stale-docs, anti-overcomplicated — do things that work without ceremony
+- **2026-03-26** [concept] — Target feeling: "this shit just works" — distills specs into actionable plans, not ceremony
+- **2026-03-26** [concept] — Core insight: greenfield work should focus questions on business logic from the customer's perspective before building
+- **2026-03-26** [concept] — Rules and tests exist to wrangle agentic development, not as feel-good ceremony for process purists
+- **2026-03-26** [concept] — GSD (Get Shit Done) with guardrails — not "move fast and break things" and not "three-week planning ceremony"
+- **2026-03-26** [concept] — Swiss cheese model (Latent Space): layered trust, each layer thin with holes, next layer catches what the last missed
+- **2026-03-26** [concept] — Greenfield philosophy: start small, build up. Don't spec everything upfront. Wiggle room to evolve.
+- **2026-03-26** [concept] — Human-centric: figure out what humans want before agents build. Core business logic first, avoid premature architecture.
+- **2026-03-26** [decision] — Target audience (today): senior devs with strong opinions, frustrated by AI tooling that's either too loose or too bureaucratic
+- **2026-03-26** [decision] — Voice: short, high info density, no fluff, no LLM cliches, feel human. Say the thing then stop.
+- **2026-03-26** [concept] — Core tenets: compact skills, lightweight guardrails, minimal code, less is more, human-readable, don't build what you don't need
+- **2026-03-26** [decision] — Branding: lightweight strategy brief written to brand/strategy.md. No full brand identity yet. Build first, brand catches up.
+- **2026-03-26** [decision] — "odd" stays as working direction, not commitment. Logo/visual identity all provisional.

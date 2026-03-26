@@ -9,6 +9,15 @@ This is a Claude Code plugin project. We are building it iteratively.
 - Don't add features, abstractions, or configurability beyond what's needed right now.
 - Prefer flat structures over deep nesting.
 - When in doubt, do less.
+- Less code is better. Humans should be able to read it.
+- Lightweight guardrails. Compact skills. Don't build what you don't need.
+
+## Voice & Style
+
+- Short, high information density. No fluff.
+- Avoid LLM cliche patterns: "it's not X, it's Y", em-dashes, "simple as that", "let's dive in", etc.
+- Avoid overwrought language, excessive sentence fragments, and scope creep in prose.
+- Feel human intuitively. Say the thing, then stop.
 
 ## Working With Me
 
