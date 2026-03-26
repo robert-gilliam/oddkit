@@ -11,6 +11,7 @@ This is a Claude Code plugin project. We are building it iteratively.
 - When in doubt, do less.
 - Less code is better. Humans should be able to read it.
 - Lightweight guardrails. Compact skills. Don't build what you don't need.
+- Use opus for skills and agents unless the task would get super expensive (high token volume, many parallel agents on large inputs). Drop to sonnet in those cases.
 
 ## Voice & Style
 
