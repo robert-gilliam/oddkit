@@ -18,6 +18,7 @@ This is a Claude Code plugin project. We are building it iteratively.
 - Avoid LLM cliche patterns: "it's not X, it's Y", em-dashes, "simple as that", "let's dive in", etc.
 - Avoid overwrought language, excessive sentence fragments, and scope creep in prose.
 - Feel human intuitively. Say the thing, then stop.
+- Don't use the word "opinionated" in user-facing copy. The tools have conviction — show it, don't label it.
 
 ## Working With Me
 

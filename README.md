@@ -3,5 +3,5 @@
 </p>
 
 <p align="center">
-  A Claude Code plugin for PR reviews.
+  Compact workflow skills for Claude Code.
 </p>

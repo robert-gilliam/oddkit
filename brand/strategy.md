@@ -42,4 +42,4 @@ Name, logo (floating eyeball with wings), and visual identity are all provisiona
 
 ## Brand Essence
 
-Compact, opinionated workflow skills for agentic development. Clarity over ceremony. GSD with just enough structure.
+Compact workflow skills for agentic development. Clarity over ceremony. GSD with just enough structure.

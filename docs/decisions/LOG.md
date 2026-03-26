@@ -4,7 +4,7 @@
 - **2026-03-26** — Audience: start personal, grow toward public distribution over time
 - **2026-03-26** — oddkit is a skill collection plugin, not a single-purpose PR review tool
 - **2026-03-26** — Created a lightweight project skill (`decision-log`) to track design decisions as we iterate
-- **2026-03-26** — Working mission: "A growing toolkit of opinionated workflow skills for Claude Code." (may revisit wording)
+- **2026-03-26** — Working mission: "Compact workflow skills for Claude Code." (may revisit wording)
 - **2026-03-26** — Name "oddkit" leaning keep, open to alternatives
 - **2026-03-26** — "Opinionated" = skills make choices for you rather than exposing lots of config. TBD on how to articulate this.
 - **2026-03-26** [concept] — The "oddness" isn't random quirk — it's having conviction to say "this is the way" when everyone else hedges with config and docs
@@ -24,3 +24,8 @@
 - **2026-03-26** [decision] — Branding: lightweight strategy brief written to brand/strategy.md. No full brand identity yet. Build first, brand catches up.
 - **2026-03-26** [decision] — "odd" stays as working direction, not commitment. Logo/visual identity all provisional.
 - **2026-03-26** [concept] — Plugin architecture research complete. Skills are the primary building block, agents for isolation/parallel work, hooks for automation.
+- **2026-03-26** [decision] — Drop "opinionated" from user-facing copy. The tools have conviction — show it through behavior, don't label it.
+- **2026-03-26** [decision] — oddkit is not just PR reviews. It's a growing collection of workflow skills. Messaging must reflect the broader scope.
+- **2026-03-26** [decision] — Merge three review skills into one: `/oddkit:review`. No args = local. PR number = GitHub (confirm before post). `--yolo` = post without asking.
+- **2026-03-26** [decision] — Auto-detect code vs plan/doc PRs and pick the right subagents. No manual mode selection.
+- **2026-03-26** [decision] — Passing a PR number implies GitHub interaction. No separate `--post` flag needed.
