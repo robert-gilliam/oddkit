@@ -23,3 +23,4 @@
 - **2026-03-26** [concept] — Core tenets: compact skills, lightweight guardrails, minimal code, less is more, human-readable, don't build what you don't need
 - **2026-03-26** [decision] — Branding: lightweight strategy brief written to brand/strategy.md. No full brand identity yet. Build first, brand catches up.
 - **2026-03-26** [decision] — "odd" stays as working direction, not commitment. Logo/visual identity all provisional.
+- **2026-03-26** [concept] — Plugin architecture research complete. Skills are the primary building block, agents for isolation/parallel work, hooks for automation.
