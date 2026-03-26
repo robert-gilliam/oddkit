@@ -9,7 +9,7 @@
 ## Install
 
 ```
-/plugin marketplace add gilliam/oddkit
+/plugin marketplace add robert-gilliam/oddkit
 /plugin install oddkit
 ```
 
