@@ -29,3 +29,7 @@
 - **2026-03-26** [decision] — Merge three review skills into one: `/oddkit:review`. No args = local. PR number = GitHub (confirm before post). `--yolo` = post without asking.
 - **2026-03-26** [decision] — Auto-detect code vs plan/doc PRs and pick the right subagents. No manual mode selection.
 - **2026-03-26** [decision] — Passing a PR number implies GitHub interaction. No separate `--post` flag needed.
+- **2026-03-26** [decision] — Own vs other PR: auto-detect but no tone adjustment. Same behavior either way. Keep it simple.
+- **2026-03-26** [decision] — Two autonomy levels only: confirm (default) and `--yolo`. No third level.
+- **2026-03-26** [decision] — `address-pr-feedback` stays separate. Same autonomy pattern: confirm default, `--yolo` to skip.
+- **2026-03-26** [decision] — All GitHub actions (post comments, push code) show summary and confirm before executing, unless `--yolo`.
