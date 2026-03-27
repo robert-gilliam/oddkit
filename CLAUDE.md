@@ -27,6 +27,7 @@ This keeps work grounded in what we've already agreed on and prevents drift from
 - Less code is better. Humans should be able to read it.
 - Lightweight guardrails. Compact skills. Don't build what you don't need.
 - Use opus for skills and agents unless the task would get super expensive (high token volume, many parallel agents on large inputs). Drop to sonnet in those cases.
+- Skill-creator evals and test workspaces go in `eval-workspace/`. This directory is gitignored.
 
 ## Voice & Style
 

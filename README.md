@@ -14,13 +14,15 @@
 ## Install
 
 ```
-/plugin install oddkit@oddkit
+claude plugin marketplace add robert-gilliam/oddkit
+claude plugin install oddkit@oddkit
 ```
 
 ## Update
 
 ```
-/install oddkit@oddkit
+claude plugin marketplace add robert-gilliam/oddkit
+claude plugin install oddkit@oddkit
 ```
 
 ## Skills
