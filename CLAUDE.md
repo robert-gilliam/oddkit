@@ -14,7 +14,7 @@ This enables the pre-push hook that auto-bumps the plugin version when `oddkit/`
 
 ## Logbook
 
-A SessionStart hook captures decisions, lessons, and insights into `docs/logbook.md` throughout every session. No manual invocation needed.
+A SessionStart hook captures decisions, lessons, and insights into `docs/logbook.md` throughout every session.
 
 ## Before Building
 
@@ -54,17 +54,6 @@ This keeps work grounded in what we've already agreed on and prevents drift from
 - After a multiple choice answer, always echo back the selected option by its full text before continuing. This prevents misreads.
 - This is a co-creation process. Teach me as we go — explain plugin terminology, conventions, and best practices when they come up naturally.
 - I'm new to Claude plugins. Use the official Anthropic docs as the canonical source for folder structures, terminology, and conventions.
-
-## What We're Building
-
-A Claude Code plugin that packages my PR review skills into a simple, easy-to-invoke collection. The four skills being imported:
-
-1. **pr-review** — Review a PR's code using parallel subagents (Bug Hunter, Ship Blocker, DX Critic)
-2. **plan-pr-review** — Review PRs containing plans/docs using specialized agents (Fact Checker, Architecture Critic, Completeness Auditor, Simplicity Auditor)
-3. **local-review** — Self-review changes locally before pushing (terminal output, no GitHub interaction)
-4. **address-pr-feedback** — End-to-end workflow for addressing GitHub PR review comments
-
-These skills may be renamed, rearranged, or restructured as part of this project.
 
 ## Key Design Goals
 
