@@ -6,7 +6,7 @@
   "plugins": [
     {
       "name": "oddkit",
-      "description": "Compact workflow skills for Claude Code.",
+      "description": "Lightweight workflow skills for Claude Code.",
       "source": ".."
     }
   ]

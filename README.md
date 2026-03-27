@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  Compact workflow skills for Claude Code.
+  Lightweight workflow skills for Claude Code.
 </p>
 
 ## Install
