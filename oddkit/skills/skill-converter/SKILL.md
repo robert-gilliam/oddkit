@@ -51,6 +51,8 @@ Think carefully about the source skill. Work through these questions internally 
 
 ## Phase 3 — Clarify
 
+Ask where the converted skill should be written. Default: `oddkit/skills/<name>/SKILL.md` (inside this plugin). Accept any path — the user may want to write into a different plugin or standalone location.
+
 Present a brief explanation of what you found, then ask ONE ROUND of questions. Rules:
 
 - Multiple choice when possible
@@ -79,9 +81,9 @@ Read these files for alignment before writing:
 Write the oddkit skill following these principles:
 
 ### Structure
-- Single SKILL.md under `${CLAUDE_PLUGIN_ROOT}/skills/<name>/`
+- Single SKILL.md at the output path chosen in Phase 3 (default: `${CLAUDE_PLUGIN_ROOT}/skills/<name>/`)
 - Reference files only if SKILL.md would exceed ~400 lines
-- Agents in `${CLAUDE_PLUGIN_ROOT}/agents/` if the skill needs isolated parallel work
+- Agents in the `agents/` directory alongside the target skill's plugin root, if the skill needs isolated parallel work
 
 ### Frontmatter
 - `name`: kebab-case, short

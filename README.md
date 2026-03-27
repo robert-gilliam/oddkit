@@ -24,17 +24,17 @@ claude plugin install oddkit@oddkit
 /oddkit:update
 ```
 
-Then restart Claude Code.
-
-If that doesn't work, update manually:
-
-```bash
-cd ~/.claude/plugins/marketplaces/oddkit && git pull
-rm -rf ~/.claude/plugins/cache/oddkit/
-claude plugin install oddkit@oddkit
-```
-
 ## Skills
+
+| Skill | What it does |
+|-------|-------------|
+| `review` | Review code or plans. Auto-detects content type. |
+| `address-feedback` | Address PR review comments: fetch, evaluate, fix, respond. |
+| `plan` | Build an implementation plan through recon, Q&A, and stress-testing. |
+| `skill-converter` | Convert external skills into oddkit skills. Keeps methodology, strips ceremony. |
+| `update` | Pull the latest oddkit from GitHub and refresh the local cache. |
+
+## Skill Details
 
 **`review`** — Review code or plans. Auto-detects content type.
 
@@ -58,11 +58,27 @@ claude plugin install oddkit@oddkit
 /oddkit:plan --out docs/plans/caching.plan.md
 ```
 
+**`skill-converter`** — Convert external skills into oddkit skills. Analyzes methodology, asks just enough to gauge intent, produces a compact skill.
+
+```
+/oddkit:skill-converter path/to/skill/SKILL.md
+/oddkit:skill-converter path/to/skill-directory/
+```
+
 **`update`** — Pull the latest oddkit from GitHub and refresh the local cache.
 
 ```
 /oddkit:update
 ```
+
+If that doesn't work, update manually:
+
+```bash
+cd ~/.claude/plugins/marketplaces/oddkit && git pull
+rm -rf ~/.claude/plugins/cache/oddkit/
+claude plugin install oddkit@oddkit
+```
+
 
 ## Development
 
