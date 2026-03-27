@@ -9,8 +9,8 @@
 ## Install
 
 ```
-/plugin marketplace add robert-gilliam/oddkit
-/plugin install oddkit
+claude plugin marketplace add robert-gilliam/oddkit
+claude plugin install oddkit@oddkit-marketplace
 ```
 
 ## Skills
