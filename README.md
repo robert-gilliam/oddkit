@@ -21,7 +21,16 @@ claude plugin install oddkit@oddkit
 ## Update
 
 ```
-claude plugin marketplace add robert-gilliam/oddkit
+/oddkit:update
+```
+
+Then restart Claude Code.
+
+If that doesn't work, update manually:
+
+```bash
+cd ~/.claude/plugins/marketplaces/oddkit && git pull
+rm -rf ~/.claude/plugins/cache/oddkit/
 claude plugin install oddkit@oddkit
 ```
 
@@ -40,6 +49,19 @@ claude plugin install oddkit@oddkit
 ```
 /oddkit:address-feedback #42          # confirm before push/reply
 /oddkit:address-feedback #42 --yolo   # push and reply without asking
+```
+
+**`plan`** — Build an implementation plan: recon, Q&A, approach selection, stress-test, phased plan.
+
+```
+/oddkit:plan add caching to the API layer
+/oddkit:plan --out docs/plans/caching.plan.md
+```
+
+**`update`** — Pull the latest oddkit from GitHub and refresh the local cache.
+
+```
+/oddkit:update
 ```
 
 ## Development

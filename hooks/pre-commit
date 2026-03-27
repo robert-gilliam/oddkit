@@ -4,6 +4,7 @@
 # Ensures consumers always get the latest skills on plugin update.
 
 PLUGIN_JSON="oddkit/.claude-plugin/plugin.json"
+MARKETPLACE_JSON=".claude-plugin/marketplace.json"
 
 # Get staged files under oddkit/
 staged=$(git diff --cached --name-only -- oddkit/)
@@ -25,8 +26,16 @@ minor=$(echo "$current" | cut -d. -f2)
 patch=$(echo "$current" | cut -d. -f3)
 new_version="$major.$minor.$((patch + 1))"
 
+# Bump both plugin.json and marketplace.json to keep versions in sync
 sed -i '' "s/\"version\": \"$current\"/\"version\": \"$new_version\"/" "$PLUGIN_JSON"
 git add "$PLUGIN_JSON"
+
+# marketplace.json may have a different version — replace whatever it has
+mkt_current=$(grep '"version"' "$MARKETPLACE_JSON" | sed 's/.*"\([0-9]*\.[0-9]*\.[0-9]*\)".*/\1/')
+if [ -n "$mkt_current" ]; then
+    sed -i '' "s/\"version\": \"$mkt_current\"/\"version\": \"$new_version\"/" "$MARKETPLACE_JSON"
+    git add "$MARKETPLACE_JSON"
+fi
 
 echo "oddkit: bumped plugin version $current → $new_version"
 exit 0
