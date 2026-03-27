@@ -28,7 +28,7 @@ claude plugin install oddkit@oddkit
 
 | Skill | What it does |
 |-------|-------------|
-| `review` | Review code or plans. Auto-detects content type. |
+| `review` | Review code, plans, or PRs. Auto-detects content type. Option to autonomously post review on GitHub |
 | `address-feedback` | Address PR review comments: fetch, evaluate, fix, respond. |
 | `plan` | Build an implementation plan through recon, Q&A, and stress-testing. |
 | `skill-converter` | Convert external skills into oddkit skills. Keeps methodology, strips ceremony. |
