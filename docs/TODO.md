@@ -61,6 +61,7 @@ Planned skills (not yet built):
 - [ ] `cleanup` — find dead code, stale branches, unused files
 - [ ] `retro` — extract lessons from recently completed tasks, append reusable rules to CLAUDE.md with deduplication
 - [ ] `skill-converter` — import an external skill and rewrite it as an oddkit skill (minimal, concise, no ceremony or AI fluff)
+- [ ] `polish` — run `review` on the current (or specified) branch, fix blocking issues, repeat until clean, then run linting/tests/CI and fix failures until everything passes
 
 ## 8. Future-Proofing
 
