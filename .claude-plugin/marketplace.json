@@ -7,10 +7,7 @@
     {
       "name": "oddkit",
       "description": "Lightweight workflow skills for Claude Code.",
-      "source": {
-        "source": "github",
-        "repo": "robert-gilliam/oddkit"
-      }
+      "source": "."
     }
   ]
 }
