@@ -49,7 +49,7 @@ Start with the basics:
 2. Why does this matter now? What's the trigger?
 3. What does success look like?
 
-Keep questions short. Wait for each answer before asking the next one.
+Keep questions short. Wait for each answer before asking the next one. After each multiple choice answer, restate the selected option by its full text before continuing (e.g., "Going with creating a parallel service.").
 
 ## Step 2 — Deepen understanding with recon findings
 

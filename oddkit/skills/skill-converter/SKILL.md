@@ -55,6 +55,7 @@ Present a brief explanation of what you found, then ask ONE ROUND of questions. 
 
 - Multiple choice when possible
 - One question at a time (ask, wait for answer, ask next)
+- After each multiple choice answer, restate the selected option by its full text before continuing
 - Maximum 5 questions total — fewer if the intent is obvious
 - Focus on decisions that change the output, not confirmations of what's obvious
 

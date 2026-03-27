@@ -51,6 +51,7 @@ This keeps work grounded in what we've already agreed on and prevents drift from
 
 - Ask me questions one at a time. Don't overwhelm me with a wall of questions.
 - Multiple choice is preferred when asking questions.
+- After a multiple choice answer, always echo back the selected option by its full text before continuing. This prevents misreads.
 - This is a co-creation process. Teach me as we go — explain plugin terminology, conventions, and best practices when they come up naturally.
 - I'm new to Claude plugins. Use the official Anthropic docs as the canonical source for folder structures, terminology, and conventions.
 
