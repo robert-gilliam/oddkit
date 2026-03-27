@@ -10,7 +10,7 @@
 
 ```
 claude plugin marketplace add robert-gilliam/oddkit
-claude plugin install oddkit@oddkit-marketplace
+claude plugin install oddkit@oddkit
 ```
 
 ## Skills
