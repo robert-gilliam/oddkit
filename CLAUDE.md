@@ -2,9 +2,9 @@
 
 This is a Claude Code plugin project. We are building it iteratively.
 
-## Always-On Skills
+## Decision Logging
 
-Run `/logbook` at the start of every session. This captures decisions, preferences, and insights into `docs/decisions/LOG.md` automatically.
+A SessionStart hook automatically reminds Claude to capture decisions, preferences, and insights into `docs/decisions/LOG.md` throughout every session. No manual invocation needed.
 
 ## Before Building
 

@@ -40,3 +40,6 @@
 - **2026-03-26** [decision] — Tagline changed from "Compact" to "Lightweight workflow skills for Claude Code."
 - **2026-03-26** [concept] — `retro` skill: extracts lessons from recently completed in-context tasks, appends reusable rules to CLAUDE.md with deduplication. Closes the learning loop without manual note-taking.
 - **2026-03-26** [concept] — `skill-converter` skill: takes an external skill and translates it into an oddkit variant — stripped of ceremony, fluff, and overengineering. Enforces oddkit tenets during conversion.
+- **2026-03-26** [decision] — Built `skill-converter` skill. 6-phase pipeline: ingest → deep analysis → one round of clarifying questions → convert → present → update tracking. Mostly autonomous with two human touchpoints.
+- **2026-03-26** [decision] — skill-converter uses the official skill-creator skill as reference methodology but produces oddkit-native output. Max 5 multiple-choice questions, one at a time.
+- **2026-03-26** [decision] — Replaced project-level `logbook` skill with a SessionStart prompt hook. Hooks can't invoke skills directly, but a prompt hook injects the logbook instructions into every session's context reliably. Removed `.claude/skills/logbook.md`.
