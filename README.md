@@ -8,7 +8,6 @@
 
 
 - **Lightweight workflow skills for Claude Code.** Just enough structure to get the job done.
-- **Business logic first.** Understand what humans want before agents start building.
 - **Guardrails that serve the agent.** Rules exist to wrangle AI, not for ceremonial process.
 - **Start small, build up.** Avoids premature architecture and overwrought frameworks.
 
