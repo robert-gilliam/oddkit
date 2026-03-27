@@ -2,6 +2,10 @@
 
 This is a Claude Code plugin project. We are building it iteratively.
 
+## Always-On Skills
+
+Run `/logbook` at the start of every session. This captures decisions, preferences, and insights into `docs/decisions/LOG.md` automatically.
+
 ## Conventions
 
 - Be concise. Say it once, say it clearly.

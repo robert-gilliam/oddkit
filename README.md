@@ -6,6 +6,13 @@
   Lightweight workflow skills for Claude Code.
 </p>
 
+Odds and ends for agentic development.
+
+- **Business logic first.** Understand what humans want before agents start building.
+- **Compact skills, few knobs.** Just enough structure to get the job done.
+- **Guardrails that serve the agent.** Rules exist to wrangle AI, not for ceremonial process.
+- **Start small, build up.** Ship, learn, iterate.
+
 ## Install
 
 ```
@@ -15,7 +22,7 @@
 ## Update
 
 ```
-/plugin update oddkit
+/install oddkit@oddkit
 ```
 
 ## Skills
