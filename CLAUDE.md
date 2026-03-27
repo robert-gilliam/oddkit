@@ -2,6 +2,16 @@
 
 This is a Claude Code plugin project. We are building it iteratively.
 
+## Setup on a New Device
+
+After cloning, point git at the repo's hooks directory:
+
+```bash
+git config core.hooksPath hooks
+```
+
+This enables the pre-push hook that auto-bumps the plugin version when `oddkit/` files change.
+
 ## Logbook
 
 A SessionStart hook captures decisions, lessons, and insights into `docs/logbook.md` throughout every session. No manual invocation needed.

@@ -1,0 +1,32 @@
+#!/bin/bash
+#
+# Auto-bump plugin patch version when oddkit/ files are committed.
+# Ensures consumers always get the latest skills on plugin update.
+
+PLUGIN_JSON="oddkit/.claude-plugin/plugin.json"
+
+# Get staged files under oddkit/
+staged=$(git diff --cached --name-only -- oddkit/)
+
+# Nothing under oddkit/ staged — nothing to do
+[ -z "$staged" ] && exit 0
+
+# If plugin.json is already staged (manual bump), skip
+echo "$staged" | grep -qx "$PLUGIN_JSON" && exit 0
+
+# If the only staged oddkit/ file is plugin.json, skip
+non_plugin=$(echo "$staged" | grep -vx "$PLUGIN_JSON")
+[ -z "$non_plugin" ] && exit 0
+
+# Bump the patch version
+current=$(grep '"version"' "$PLUGIN_JSON" | sed 's/.*"\([0-9]*\.[0-9]*\.[0-9]*\)".*/\1/')
+major=$(echo "$current" | cut -d. -f1)
+minor=$(echo "$current" | cut -d. -f2)
+patch=$(echo "$current" | cut -d. -f3)
+new_version="$major.$minor.$((patch + 1))"
+
+sed -i '' "s/\"version\": \"$current\"/\"version\": \"$new_version\"/" "$PLUGIN_JSON"
+git add "$PLUGIN_JSON"
+
+echo "oddkit: bumped plugin version $current → $new_version"
+exit 0
