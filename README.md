@@ -9,8 +9,13 @@
 ## Install
 
 ```
-claude plugin marketplace add robert-gilliam/oddkit
-claude plugin install oddkit@oddkit
+/plugin install oddkit@oddkit
+```
+
+## Update
+
+```
+/plugin update oddkit
 ```
 
 ## Skills
@@ -32,6 +37,17 @@ claude plugin install oddkit@oddkit
 
 ## Development
 
+To work on oddkit locally, load the plugin directly from source instead of the cached marketplace version:
+
+```bash
+claude --plugin-dir /path/to/oddkit/oddkit
 ```
-/reload-plugins
+
+To make this permanent, add a shell alias:
+
+```bash
+# ~/.zshrc or ~/.bashrc
+alias claude='claude --plugin-dir /path/to/oddkit/oddkit'
 ```
+
+Changes take effect on next launch. Use `/reload-plugins` to pick up changes mid-session.

@@ -3,11 +3,15 @@
   "owner": {
     "name": "Robert Gilliam"
   },
+  "metadata": {
+    "pluginRoot": "."
+  },
   "plugins": [
     {
       "name": "oddkit",
       "description": "Lightweight workflow skills for Claude Code.",
-      "source": "./plugins/oddkit"
+      "source": "./oddkit",
+      "version": "0.1.0"
     }
   ]
 }
