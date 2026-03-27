@@ -2,9 +2,9 @@
 
 This is a Claude Code plugin project. We are building it iteratively.
 
-## Decision Logging
+## Logbook
 
-A SessionStart hook automatically reminds Claude to capture decisions, preferences, and insights into `docs/decisions/LOG.md` throughout every session. No manual invocation needed.
+A SessionStart hook captures decisions, lessons, and insights into `docs/logbook.md` throughout every session. No manual invocation needed.
 
 ## Before Building
 
@@ -12,7 +12,7 @@ Read the docs before writing anything. The `docs/` directory contains the decisi
 
 - `docs/TODO.md` — current priorities and what's already done
 - `docs/research-architecture.md` — canonical plugin structure and patterns
-- `docs/decisions/LOG.md` — prior decisions and rationale
+- `docs/logbook.md` — prior decisions, lessons learned, and project insights
 - `docs/brand/strategy.md` — voice, tone, and positioning
 
 This keeps work grounded in what we've already agreed on and prevents drift from the project's direction.

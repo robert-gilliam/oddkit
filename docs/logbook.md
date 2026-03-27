@@ -1,0 +1,52 @@
+# Logbook
+
+- **2026-03-26** [decision] — Core problem: packaging scattered personal workflow skills into a portable, shareable collection (not just PR reviews)
+- **2026-03-26** [decision] — Audience: start personal, grow toward public distribution over time
+- **2026-03-26** [decision] — oddkit is a skill collection plugin, not a single-purpose PR review tool
+- **2026-03-26** [decision] — Created a lightweight project skill (`decision-log`) to track design decisions as we iterate
+- **2026-03-26** [decision] — Working mission: "Compact workflow skills for Claude Code." (may revisit wording)
+- **2026-03-26** [decision] — Name "oddkit" leaning keep, open to alternatives
+- **2026-03-26** [insight] — "Opinionated" = skills make choices for you rather than exposing lots of config. TBD on how to articulate this.
+- **2026-03-26** [insight] — The "oddness" isn't random quirk — it's having conviction to say "this is the way" when everyone else hedges with config and docs
+- **2026-03-26** [insight] — oddkit rejects both extremes in AI-dev tooling: max configurability (47 knobs) and max documentation (30-page guides). It's "I figured out the good way, just use it."
+- **2026-03-26** [insight] — Floating eyeball with wings as logo concept — watchful, uncanny, moves freely, sees things others don't
+- **2026-03-26** [insight] — Anti-stale-docs, anti-overcomplicated — do things that work without ceremony
+- **2026-03-26** [insight] — Target feeling: "this shit just works" — distills specs into actionable plans, not ceremony
+- **2026-03-26** [insight] — Core insight: greenfield work should focus questions on business logic from the customer's perspective before building
+- **2026-03-26** [insight] — Rules and tests exist to wrangle agentic development, not as feel-good ceremony for process purists
+- **2026-03-26** [insight] — GSD (Get Shit Done) with guardrails — not "move fast and break things" and not "three-week planning ceremony"
+- **2026-03-26** [insight] — Swiss cheese model (Latent Space): layered trust, each layer thin with holes, next layer catches what the last missed
+- **2026-03-26** [insight] — Greenfield philosophy: start small, build up. Don't spec everything upfront. Wiggle room to evolve.
+- **2026-03-26** [insight] — Human-centric: figure out what humans want before agents build. Core business logic first, avoid premature architecture.
+- **2026-03-26** [decision] — Target audience (today): senior devs with strong opinions, frustrated by AI tooling that's either too loose or too bureaucratic
+- **2026-03-26** [decision] — Voice: short, high info density, no fluff, no LLM cliches, feel human. Say the thing then stop.
+- **2026-03-26** [insight] — Core tenets: compact skills, lightweight guardrails, minimal code, less is more, human-readable, don't build what you don't need
+- **2026-03-26** [decision] — Branding: lightweight strategy brief written to docs/brand/strategy.md. No full brand identity yet. Build first, brand catches up.
+- **2026-03-26** [decision] — "odd" stays as working direction, not commitment. Logo/visual identity all provisional.
+- **2026-03-26** [insight] — Plugin architecture research complete. Skills are the primary building block, agents for isolation/parallel work, hooks for automation.
+- **2026-03-26** [decision] — Drop "opinionated" from user-facing copy. The tools have conviction — show it through behavior, don't label it.
+- **2026-03-26** [decision] — oddkit is not just PR reviews. It's a growing collection of workflow skills. Messaging must reflect the broader scope.
+- **2026-03-26** [decision] — Merge three review skills into one: `/oddkit:review`. No args = local. PR number = GitHub (confirm before post). `--yolo` = post without asking.
+- **2026-03-26** [decision] — Auto-detect code vs plan/doc PRs and pick the right subagents. No manual mode selection.
+- **2026-03-26** [decision] — Passing a PR number implies GitHub interaction. No separate `--post` flag needed.
+- **2026-03-26** [decision] — Own vs other PR: auto-detect but no tone adjustment. Same behavior either way. Keep it simple.
+- **2026-03-26** [decision] — Two autonomy levels only: confirm (default) and `--yolo`. No third level.
+- **2026-03-26** [decision] — `address-pr-feedback` stays separate. Same autonomy pattern: confirm default, `--yolo` to skip.
+- **2026-03-26** [decision] — All GitHub actions (post comments, push code) show summary and confirm before executing, unless `--yolo`.
+- **2026-03-26** [decision] — All 7 agents use opus. Sonnet only if cost becomes an issue.
+- **2026-03-26** [decision] — Plugin structure: skills/ (review, address-feedback), agents/ (7 shared), .claude-plugin/plugin.json (minimal).
+- **2026-03-26** [decision] — Future skills planned: create-pr, plan, implement, commit, debug, cleanup. Build as needed.
+- **2026-03-26** [decision] — Distribution: repo is its own marketplace. Source format is github object `{"source": "github", "repo": "robert-gilliam/oddkit"}`.
+- **2026-03-26** [decision] — Tagline changed from "Compact" to "Lightweight workflow skills for Claude Code."
+- **2026-03-26** [insight] — `retro` skill: extracts lessons from recently completed in-context tasks, appends reusable rules to CLAUDE.md with deduplication. Closes the learning loop without manual note-taking.
+- **2026-03-26** [insight] — `skill-converter` skill: takes an external skill and translates it into an oddkit variant — stripped of ceremony, fluff, and overengineering. Enforces oddkit tenets during conversion.
+- **2026-03-26** [decision] — Built `skill-converter` skill. 6-phase pipeline: ingest → deep analysis → one round of clarifying questions → convert → present → update tracking. Mostly autonomous with two human touchpoints.
+- **2026-03-26** [decision] — skill-converter uses the official skill-creator skill as reference methodology but produces oddkit-native output. Max 5 multiple-choice questions, one at a time.
+- **2026-03-26** [decision] — Replaced project-level `logbook` skill with a SessionStart prompt hook. Hooks can't invoke skills directly, but a prompt hook injects the logbook instructions into every session's context reliably. Removed `.claude/skills/logbook.md`.
+- **2026-03-26** [decision] — Built `plan` skill. Consolidated understanding, solutioning, tire-kicking, and planning from wills_agent_skills into one flow. Parallel recon agents (code-scout, impact-scout) run while developer conversation starts. Adaptive questioning — scales with complexity. Lightweight stress-test folded into the plan. Conditional solutioning: recommend when clear, present options when ambiguous.
+- **2026-03-27** [lesson] — Installation instructions must not be simplified. oddkit is not a registered marketplace plugin. Never change without explicit instruction.
+- **2026-03-27** [lesson] — Corrections from the user are project-level lessons, not just agent feedback. Log them to the logbook, not just to memory.
+- **2026-03-27** [decision] — Replaced decision log + auto-memory with a single logbook (docs/logbook.md). Three entry types: decision, lesson, insight. Loaded every session. Warning at 100 lines.
+- **2026-03-26** [lesson] — Use git worktrees for cross-branch ops, never checkout main directly. Avoids disrupting the working branch mid-session.
+- **2026-03-26** [lesson] — Avoid negation-heavy copy ("not X", "no Y") in lists. One negation is fine, three is an LLM pattern. Frame around what the tool does.
+- **2026-03-26** [lesson] — Don't label the tools "opinionated" in user-facing copy. Show conviction through behavior.

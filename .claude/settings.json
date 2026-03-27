@@ -5,7 +5,7 @@
       "hooks": [
         {
           "type": "prompt",
-          "prompt": "Throughout this session, capture decisions, concepts, and preferences into docs/decisions/LOG.md. User prompts are gold — every prompt may contain design decisions, voice preferences, branding choices, corrections, or conceptual insights. Extract and log them without being asked.\n\nEntry format: - **YYYY-MM-DD** [type] — [summary]\nTypes: decision, concept, preference\n\nRules: summarize in one sentence, group related items, read the log first to avoid duplicates, append only, never edit existing entries. If the file doesn't exist, create it with a # Decision Log heading."
+          "prompt": "Throughout this session, capture decisions, lessons, and insights into docs/logbook.md. User prompts are gold — every prompt may contain design direction, corrections, preferences, or patterns worth preserving. Extract and log them without being asked.\n\nEntry format: - **YYYY-MM-DD** [type] — summary\nTypes: decision (choices made), lesson (mistakes/corrections), insight (patterns/concepts/context)\n\nRules: one sentence per entry. Read the logbook first to avoid duplicates. Append only. Never edit existing entries. If the file is over 100 lines, note this at the start of the session."
         }
       ]
     }
