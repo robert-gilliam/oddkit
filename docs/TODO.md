@@ -54,7 +54,7 @@ Status key: `[ ]` not started, `[~]` in progress, `[x]` done
 Planned skills (not yet built):
 
 - [ ] `create-pr` — gather diff, write description, open PR
-- [ ] `plan` — create an implementation plan from a spec or issue
+- [ ] `plan` — create an implementation plan from a spec or issue, or from scratch
 - [ ] `implement` — execute a plan with verification checkpoints
 - [ ] `commit` — smart commit with good message from staged changes
 - [ ] `debug` — systematic debugging of a failing test or error
