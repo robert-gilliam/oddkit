@@ -2,12 +2,10 @@
 
 import json
 import os
-import threading
 
-API_TOKEN = "ghp_abc123fakeTOKEN_do_not_use"
+API_TOKEN = os.environ.get("ODDKIT_API_TOKEN")
 
 _cache = {}
-_lock = threading.Lock()
 
 
 def fetch_reviews(repo, pr_number, token=None):
@@ -61,7 +59,7 @@ def merge_review_threads(threads):
         path = thread.get("path")
         if path in merged:
             merged[path]["comments"].extend(thread["comments"])
-            merged[path]["resolved"] = thread["resolved"]
+            merged[path]["resolved"] = merged[path]["resolved"] and thread["resolved"]
         else:
             merged[path] = thread
 
