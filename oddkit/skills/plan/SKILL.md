@@ -115,6 +115,8 @@ If you find leaks, surface them to the developer with proposed fixes. Resolve be
 
 Fold all bends into the plan as explicit callouts. Don't let implicit assumptions survive this step.
 
+As you work through scenarios, collect the observable behaviors that define "done." These become the acceptance criteria in the plan. Edge cases that bent or leaked are often the most important ones to capture.
+
 ## Step 5 — Write the plan
 
 ### Find the right location
@@ -167,9 +169,16 @@ Create the directory if it doesn't exist. Name the file `<slug>.plan.md` where `
 
 ---
 
-## Verification
-<!-- How to confirm the plan was executed correctly. -->
-<!-- Test commands, manual checks, acceptance criteria. -->
+## Acceptance Criteria
+<!-- Observable behaviors that define "done." -->
+<!-- Format: "When [action/condition], [expected result]." -->
+<!-- Scale depth to complexity: simple features get a few criteria, -->
+<!-- complex features get thorough criteria plus a Test Scenarios subsection. -->
+
+### Test Scenarios (complex features only)
+<!-- Scenarios the implementing agent should write tests for. -->
+<!-- Describe what to test, not how — let the implementer choose framework and structure. -->
+<!-- Include: happy paths, edge cases, error conditions, boundary values. -->
 ```
 
 **Phase -> Step breakdown.** Each phase is a logical chunk of work. Each step is a concrete action within that phase. Include:
@@ -179,6 +188,10 @@ Create the directory if it doesn't exist. Name the file `<slug>.plan.md` where `
 - Dependencies between phases
 
 **Keep it concrete.** Reference actual file paths, function names, and patterns from the recon findings. A plan that says "update the service layer" is useless. A plan that says "add a `processRefund` method to `src/services/billing.ts` following the pattern in `processCharge`" is actionable.
+
+**Acceptance criteria scale to complexity.** Every plan gets acceptance criteria — observable behaviors written as "When [action/condition], [expected result]." For straightforward changes, 3-5 criteria covering the core behavior is enough.
+
+For complex features (multi-phase plans, multiple modules affected, branching logic, significant edge cases from stress-testing), add the `### Test Scenarios` subsection. List the scenarios worth testing: happy paths, edge cases, error conditions, boundary values. Describe *what* to test, not *how* — the implementing agent picks the test framework, file structure, and assertions. The scenarios from Step 4's stress-test are the best source material here.
 
 **Include gotchas.** If recon found something tricky (circular dependency, shared state, flaky test), call it out where it matters in the plan.
 
