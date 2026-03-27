@@ -51,6 +51,8 @@ git fetch origin main
 git update-ref refs/heads/main refs/remotes/origin/main
 ```
 
+If `git fetch` fails (sandbox, network, permissions), continue with the local `main`. Warn: "Could not fetch latest main — reviewing against local state."
+
 ### Get the diff (local review only)
 
 If `TARGET_REF` is not the current branch, fetch it and create a temporary worktree:
@@ -80,7 +82,11 @@ If mixed, treat as code review (code agents catch what matters most).
 
 ### Code review → 3 agents in parallel
 
-Spawn `@oddkit:bug-hunter`, `@oddkit:ship-blocker`, `@oddkit:dx-critic` using the Agent tool.
+Use the Agent tool to spawn three agents simultaneously (all in a single tool-call turn):
+
+- `subagent_type: "oddkit:bug-hunter"`
+- `subagent_type: "oddkit:ship-blocker"`
+- `subagent_type: "oddkit:dx-critic"`
 
 Pass each agent:
 - The diff (use `PR_DIFF` for GitHub reviews, local diff for local reviews)
@@ -89,9 +95,18 @@ Pass each agent:
 
 Each must quote exact code snippets from the diff for every finding.
 
+If the Agent tool is unavailable (e.g., running inside a subagent), perform the analysis inline: apply each agent's criteria from `oddkit/agents/` sequentially, keeping findings tagged by agent role.
+
 ### Plan review → 4 agents in parallel
 
-Spawn `@oddkit:fact-checker`, `@oddkit:architecture-critic`, `@oddkit:completeness-auditor`, `@oddkit:simplicity-auditor`.
+Use the Agent tool to spawn four agents simultaneously:
+
+- `subagent_type: "oddkit:fact-checker"`
+- `subagent_type: "oddkit:architecture-critic"`
+- `subagent_type: "oddkit:completeness-auditor"`
+- `subagent_type: "oddkit:simplicity-auditor"`
+
+Same fallback: if Agent tool is unavailable, apply each agent's criteria inline from `oddkit/agents/`.
 
 For fact-checker, also read full file contents (not just diff hunks) so it can verify claims against the codebase. Pass all agents the diff, PR description, and for GitHub reviews the file list with the same scoping instruction.
 
