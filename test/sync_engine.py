@@ -14,10 +14,16 @@ def fetch_reviews(repo, pr_number, token=None):
     url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews"
 
     import urllib.request
+    import urllib.error
     req = urllib.request.Request(url)
     req.add_header("Authorization", f"token {token}")
 
-    response = urllib.request.urlopen(req)
+    try:
+        response = urllib.request.urlopen(req)
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"GitHub API returned {e.code}: {e.reason}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Failed to reach GitHub API: {e.reason}") from e
     data = json.loads(response.read())
 
     # Cache results
