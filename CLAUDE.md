@@ -6,6 +6,17 @@ This is a Claude Code plugin project. We are building it iteratively.
 
 Run `/logbook` at the start of every session. This captures decisions, preferences, and insights into `docs/decisions/LOG.md` automatically.
 
+## Before Building
+
+Read the docs before writing anything. The `docs/` directory contains the decisions, research, and design principles behind this project. Before starting a task, check:
+
+- `docs/TODO.md` — current priorities and what's already done
+- `docs/research-architecture.md` — canonical plugin structure and patterns
+- `docs/decisions/LOG.md` — prior decisions and rationale
+- `docs/brand/strategy.md` — voice, tone, and positioning
+
+This keeps work grounded in what we've already agreed on and prevents drift from the project's direction.
+
 ## Conventions
 
 - Be concise. Say it once, say it clearly.
