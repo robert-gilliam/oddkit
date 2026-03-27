@@ -31,6 +31,17 @@ Store `PR_NUMBER`, `PR_BODY`, `HEAD_SHA`, `OWNER`, `REPO`, `TARGET_REF`, `BASE_R
 
 If no PR found, stop: "No open PR found. Push your branch and open a PR first."
 
+Get GitHub's canonical diff — this is the authoritative source for what's in the PR:
+
+```bash
+gh pr diff <PR_NUMBER>
+gh pr diff <PR_NUMBER> --name-only
+```
+
+Store the diff as `PR_DIFF` and the file list as `PR_FILES`.
+
+Use `PR_DIFF` for all analysis. Do NOT use `git diff` for GitHub reviews — local diffs can diverge from what GitHub considers part of the PR.
+
 ### If no args (local review)
 
 ```bash
@@ -40,7 +51,9 @@ git fetch origin main
 git update-ref refs/heads/main refs/remotes/origin/main
 ```
 
-### Get the diff
+If `git fetch` fails (sandbox, network, permissions), continue with the local `main`. Warn: "Could not fetch latest main — reviewing against local state."
+
+### Get the diff (local review only)
 
 If `TARGET_REF` is not the current branch, fetch it and create a temporary worktree:
 
@@ -69,15 +82,33 @@ If mixed, treat as code review (code agents catch what matters most).
 
 ### Code review → 3 agents in parallel
 
-Spawn `@oddkit:bug-hunter`, `@oddkit:ship-blocker`, `@oddkit:dx-critic` using the Agent tool.
+Use the Agent tool to spawn three agents simultaneously (all in a single tool-call turn):
 
-Pass each agent the full diff and PR description (if available). Each must quote exact code snippets from the diff for every finding.
+- `subagent_type: "oddkit:bug-hunter"`
+- `subagent_type: "oddkit:ship-blocker"`
+- `subagent_type: "oddkit:dx-critic"`
+
+Pass each agent:
+- The diff (use `PR_DIFF` for GitHub reviews, local diff for local reviews)
+- PR description (if available)
+- **For GitHub reviews:** the file list (`PR_FILES`) with this instruction: "Only report findings in these files. These are the files in the PR diff."
+
+Each must quote exact code snippets from the diff for every finding.
+
+If the Agent tool is unavailable (e.g., running inside a subagent), perform the analysis inline: apply each agent's criteria from `oddkit/agents/` sequentially, keeping findings tagged by agent role.
 
 ### Plan review → 4 agents in parallel
 
-Spawn `@oddkit:fact-checker`, `@oddkit:architecture-critic`, `@oddkit:completeness-auditor`, `@oddkit:simplicity-auditor`.
+Use the Agent tool to spawn four agents simultaneously:
 
-For fact-checker, also read full file contents (not just diff hunks) so it can verify claims against the codebase. Pass all agents the diff and PR description.
+- `subagent_type: "oddkit:fact-checker"`
+- `subagent_type: "oddkit:architecture-critic"`
+- `subagent_type: "oddkit:completeness-auditor"`
+- `subagent_type: "oddkit:simplicity-auditor"`
+
+Same fallback: if Agent tool is unavailable, apply each agent's criteria inline from `oddkit/agents/`.
+
+For fact-checker, also read full file contents (not just diff hunks) so it can verify claims against the codebase. Pass all agents the diff, PR description, and for GitHub reviews the file list with the same scoping instruction.
 
 Each must quote exact text from the plan for every finding.
 
@@ -151,44 +182,18 @@ Done. No GitHub interaction.
 
 ### GitHub review (PR reference provided)
 
-#### Compute diff positions
+#### Confirm before posting
 
-For each finding, compute the GitHub diff `position` (not file line number):
+Unless `--yolo`:
+- Show number of findings, severity breakdown, summary table
+- Ask: "Post this review to PR #{PR_NUMBER}? (y/n)"
+- If declined, show findings locally and stop
 
-1. Find the file's diff section
-2. Find the hunk containing the target line (`@@ -old,count +new,count @@`)
-3. Count every line from the first `@@` header (position 1). Positions are cumulative across hunks.
-4. Track new-file line number from hunk's `+new` value. Context (` `) and additions (`+`) increment. Deletions (`-`) don't.
-5. When new-file line matches target, that's the position.
+#### Post findings
 
-If target line isn't in any hunk, include in review body instead.
+**Default: use `mcp__github_inline_comment__create_inline_comment` if available.**
 
-#### Build review payload
-
-```json
-{
-  "commit_id": "{HEAD_SHA}",
-  "body": "{summary}",
-  "event": "{BLOCKING → REQUEST_CHANGES | WARNING only → COMMENT | none → APPROVE}",
-  "comments": [{ "path": "...", "position": N, "body": "..." }]
-}
-```
-
-Summary table format:
-
-```
-## Automated Review
-
-**{N} issue(s) found** ({B} blocking, {W} warnings)
-
-| # | Severity | File | Issue |
-|---|----------|------|-------|
-| 1 | BLOCKING | `file:line` | Description |
-
-*Reviewed by: {agent names}*
-```
-
-Inline comment format (keep tight):
+For each finding, post an inline comment using the MCP tool with `confirmed: true`. Format:
 
 ```
 **{SEVERITY}** — [{Agent}]
@@ -198,20 +203,51 @@ Inline comment format (keep tight):
 **Why:** {Explanation}
 ```
 
-#### Confirm and post
+For small, self-contained fixes, include a committable suggestion block. For larger fixes (6+ lines, structural changes, multi-file), describe the fix without a suggestion block.
 
-Unless `--yolo`:
-- Show review event type, number of comments, summary table
-- Ask: "Post this review to PR #{PR_NUMBER}? (y/n)"
-- If declined, show findings locally and stop
+Post one comment per unique issue. Do not post duplicates.
 
-Post via:
+**Fallback: `gh pr comment` with code links.**
+
+If the MCP inline comment tool is not available, post a single comment on the PR:
 
 ```bash
-gh api repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/reviews --method POST --input /tmp/review-payload.json
+gh pr comment <PR_NUMBER> --body "<review body>"
 ```
 
-Report: issues found, discarded count, review event, PR link.
+Format the body with linked code references. Use full SHA links so GitHub renders syntax-highlighted code previews:
+
+```
+## Automated Review
+
+**{N} issue(s) found** ({B} blocking, {W} warnings)
+
+*Reviewed by: {agent names}*
+
+---
+
+### 1. {SEVERITY} — {Issue title}
+
+[{file}:{line}](https://github.com/{OWNER}/{REPO}/blob/{HEAD_SHA}/{file}#L{start}-L{end})
+
+{Issue description}
+
+**Why:** {Explanation}
+
+---
+
+(repeat for each finding)
+
+*{count} finding(s) removed during verification.*
+```
+
+Link format must be exact — full SHA, `#L{start}-L{end}` with at least 1 line of context above and below:
+
+```
+https://github.com/{OWNER}/{REPO}/blob/{HEAD_SHA}/{path}#L{start}-L{end}
+```
+
+Report: issues found, discarded count, PR link.
 
 ## Step 5 — Clean up
 
