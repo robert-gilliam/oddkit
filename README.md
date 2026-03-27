@@ -3,15 +3,13 @@
 </p>
 
 <p align="center">
-  Lightweight workflow skills for Claude Code.
+  Odds and ends for agentic development.
 </p>
 
-Odds and ends for agentic development.
 
-- **Business logic first.** Understand what humans want before agents start building.
-- **Compact skills, few knobs.** Just enough structure to get the job done.
+- **Lightweight Claude Code skills to accelerate your workflow.** Just enough structure to get the job done.
 - **Guardrails that serve the agent.** Rules exist to wrangle AI, not for ceremonial process.
-- **Start small, build up.** Ship, learn, iterate.
+- **Start small, build up.** Avoids premature architecture and overwrought frameworks.
 
 ## Install
 
