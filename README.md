@@ -7,7 +7,7 @@
 </p>
 
 
-- **Lightweight autonomous Claude Code skills to accelerate your workflow.** Just enough structure to get the job done.
+- **Lightweight autonomous Claude Code skills to accelerate your workflow.**
 - **Guardrails that serve the agent.** Rules exist to wrangle AI, not for ceremonial process.
 - **Start small, build up.** Avoids premature architecture and overwrought frameworks.
 
