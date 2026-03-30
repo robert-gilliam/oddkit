@@ -10,9 +10,10 @@ Build `/oddkit:implement` — a skill that reads an oddkit plan file and execute
 2. **Confirm once at the start, then run.** Show the plan summary, get a go/no-go, then execute autonomously. `--yolo` skips even that.
 3. **Hybrid context management.** Simple phases run inline. Complex phases (>3 steps or >5 files) get a fresh subagent with a focused handoff prompt.
 4. **Let the plan decide verification granularity.** If a phase has verification instructions, follow them. Otherwise commit per phase with a compliance check.
-5. **Phase-level compliance checks.** After each phase, a fresh agent compares implementation against the plan. On deviation: attempt one fix, re-check, stop if it fails again.
-6. **Verification + cleanup at the end.** Bug-hunter and ship-blocker check the full diff. Then a cleanup agent checks for entropy (stale docs, dead code, contradictions).
+5. **Inline compliance checks.** After each phase, a fresh subagent compares implementation against the plan. No separate agent file — the check is a focused prompt within the skill. Extract to an agent later if multiple skills need it.
+6. **Verification at the end.** Bug-hunter and ship-blocker check the full diff. Cleanup is left to `/oddkit:review`.
 7. **Progress checkboxes are the state machine.** The skill updates `## Progress` in the plan file as phases complete, enabling resume on re-invocation.
+8. **Commit per phase, fixup for corrections.** Each phase gets its own commit. If a compliance check requires fixes to a prior phase, those get a new fixup commit — never amend.
 
 ## Risks
 
@@ -21,56 +22,18 @@ Build `/oddkit:implement` — a skill that reads an oddkit plan file and execute
 | Compliance checker is too strict, flags non-deviations | Medium | Scope it tightly: check file targets and behavioral intent, not implementation style |
 | Complex phase subagent exhausts its own context | Low | Warn if a phase has >8 steps; suggest breaking it down via plan skill |
 | Plan file corruption on crash mid-checkbox-update | Low | Checkbox updates are small atomic edits via the Edit tool |
-| Cleanup agent over-corrects, changes things it shouldn't | Medium | Scope to files touched + their direct references only; report-only, no auto-fix |
 
 ## Progress
-- [ ] Phase 1: Create the compliance-checker agent
-- [ ] Phase 2: Create the implement skill
-- [ ] Phase 3: Update TODO and README
+- [x] Phase 1: Create the implement skill
+- [x] Phase 2: Update TODO and README
 
 ---
 
-## Phase 1: Create the compliance-checker agent
-
-A new agent that compares a plan phase's intent against the actual implementation. This doesn't exist yet — bug-hunter and ship-blocker check for bugs and security, not plan adherence.
-
-### Step 1.1: Create `oddkit/agents/compliance-checker.md`
-
-Follow the existing agent pattern (YAML frontmatter + focused instructions). The agent receives:
-- The plan phase description (phase text + its steps)
-- The key decisions section from the plan
-- The diff of changes made during that phase
-
-It checks:
-- Were the specified files created/modified/removed?
-- Does the implementation match the behavioral intent of each step?
-- Were verification instructions followed (if any)?
-- Are there significant additions or omissions not in the plan?
-
-Output format matches the existing agent convention:
-
-```
-FILE: <path>
-STEP: <which plan step this relates to>
-SEVERITY: DEVIATION | DRIFT
-ISSUE: <one line>
-EXPECTED: <what the plan said>
-ACTUAL: <what was implemented>
-```
-
-DEVIATION = wrong behavior. DRIFT = extra work or skipped work that doesn't break intent.
-
-**Files:** `oddkit/agents/compliance-checker.md` (new)
-
-**Verify:** Agent file exists, frontmatter is valid, follows the pattern of existing agents.
-
----
-
-## Phase 2: Create the implement skill
+## Phase 1: Create the implement skill
 
 The core skill. Single file: `oddkit/skills/implement/SKILL.md`.
 
-### Step 2.1: Frontmatter and argument parsing
+### Step 1.1: Frontmatter and argument parsing
 
 Frontmatter fields following existing conventions:
 - `name: implement`
@@ -79,14 +42,14 @@ Frontmatter fields following existing conventions:
 - `model: opus`
 
 Argument parsing:
-- **Plan file path**: positional argument. If omitted, auto-discover using the same heuristic as the plan skill (search for `*.plan.md`, `*-plan.md` in known directories). If multiple found, list them and ask which one.
+- **Plan file path**: positional argument. If omitted, glob for `*.plan.md` files. If one found, use it. If multiple found, list them and ask which one. If none found, stop.
 - **`--yolo`**: skip the initial confirmation.
 
 **Files:** `oddkit/skills/implement/SKILL.md` (new)
 
 **Pattern to follow:** `oddkit/skills/plan/SKILL.md` for frontmatter and arg parsing, `oddkit/skills/address-feedback/SKILL.md` for the phased execution structure.
 
-### Step 2.2: Plan validation (pre-task defense)
+### Step 1.2: Plan validation (pre-task defense)
 
 After reading the plan file, validate before starting:
 - Does it have `## Progress` with at least one unchecked phase?
@@ -98,7 +61,7 @@ If issues found, report them and stop: "This plan has gaps. Run `/oddkit:plan` t
 
 If all phases are already checked, stop: "All phases complete. Nothing to implement."
 
-### Step 2.3: Initial confirmation gate
+### Step 1.3: Initial confirmation gate
 
 Show a summary:
 ```
@@ -113,7 +76,7 @@ Proceed? (yes / abort)
 
 Unless `--yolo`, wait for confirmation. On abort, stop.
 
-### Step 2.4: Phase execution loop
+### Step 1.4: Phase execution loop
 
 For each unchecked phase in `## Progress` order:
 
@@ -140,10 +103,32 @@ If the phase's steps include verification instructions (commands to run, things 
 Stage and commit changes for this phase: `Implement phase N: <phase name>`
 
 **5. Compliance check.**
-Spawn `@oddkit:compliance-checker` with:
-- The phase description and steps from the plan
-- The key decisions section
-- The diff for this phase's commit (`git diff HEAD~1`)
+Spawn a fresh subagent with this focused prompt:
+
+> You are checking whether an implementation matches its plan. Compare the phase description against the actual changes.
+>
+> **Phase description and steps:** <phase text>
+> **Key decisions:** <key decisions section>
+> **Diff:** <git diff HEAD~1>
+>
+> Check:
+> - Were the specified files created/modified/removed?
+> - Does the implementation match the behavioral intent of each step?
+> - Were verification instructions followed (if any)?
+> - Are there significant additions or omissions not in the plan?
+>
+> For each issue found, output:
+> ```
+> FILE: <path>
+> STEP: <which plan step this relates to>
+> SEVERITY: DEVIATION | DRIFT
+> ISSUE: <one line>
+> EXPECTED: <what the plan said>
+> ACTUAL: <what was implemented>
+> ```
+>
+> DEVIATION = wrong behavior. DRIFT = extra work or skipped work that doesn't break intent.
+> If everything matches, output: "No deviations found."
 
 If DEVIATION findings:
 - Attempt one fix based on the compliance checker's report
@@ -155,7 +140,7 @@ If only DRIFT findings: log them but continue.
 **6. Update progress.**
 Edit the plan file: change `- [ ] Phase N: <name>` to `- [x] Phase N: <name>`.
 
-### Step 2.5: Post-implementation verification pass
+### Step 1.5: Post-implementation verification pass
 
 After all phases complete, spawn two agents in parallel on the full diff (`git diff` from before the first phase commit to HEAD):
 
@@ -166,22 +151,7 @@ If BLOCKING findings: report them. Don't auto-fix — these are cross-cutting is
 
 If only WARNINGs: report them as advisories.
 
-### Step 2.6: Cleanup pass (entropy defense)
-
-Spawn a fresh agent to check for entropy introduced by the implementation. Scope:
-- Files modified during implementation
-- Files that import or reference modified files
-- Documentation files that mention changed APIs or behaviors
-
-The agent checks for:
-- Stale comments or docstrings that reference old behavior
-- Dead code left behind by refactoring
-- Documentation that contradicts the new implementation
-- Unused imports or variables introduced
-
-Report findings. Do not auto-fix — the user or a follow-up `/oddkit:review` handles cleanup.
-
-### Step 2.7: Final report
+### Step 1.6: Final report
 
 ```
 ## Implementation Complete — <plan title>
@@ -193,11 +163,8 @@ Report findings. Do not auto-fix — the user or a follow-up `/oddkit:review` ha
 - Bug Hunter: {N findings / clean}
 - Ship Blocker: {N findings / clean}
 
-### Cleanup
-- {N entropy issues found / clean}
-
 ### Next steps
-- Run `/oddkit:review` to review the changes
+- Run `/oddkit:review` to review the full diff
 - Run tests if not already covered by plan verification steps
 ```
 
@@ -207,15 +174,15 @@ Report findings. Do not auto-fix — the user or a follow-up `/oddkit:review` ha
 
 ---
 
-## Phase 3: Update TODO and README
+## Phase 2: Update TODO and README
 
-### Step 3.1: Mark implement as done in `docs/TODO.md`
+### Step 2.1: Mark implement as done in `docs/TODO.md`
 
 Change `- [ ] \`implement\`` to `- [x] \`implement\`` in the Future Skills section.
 
 **Files:** `docs/TODO.md`
 
-### Step 3.2: Add implement to README skill list
+### Step 2.2: Add implement to README skill list
 
 Add the implement skill to the skills section of README.md, following the existing format.
 
@@ -235,16 +202,4 @@ Add the implement skill to the skills section of README.md, following the existi
 - When the skill is re-invoked on a partially-completed plan, it resumes from the first unchecked phase.
 - When a compliance check detects a DEVIATION, the skill attempts one fix and re-checks. If it fails again, it stops with a report.
 - When all phases complete, bug-hunter and ship-blocker run on the full diff and findings are reported.
-- When all phases complete, a cleanup agent checks for entropy and reports findings.
 - When all phases were already checked, the skill reports "nothing to implement" and stops.
-
-### Test Scenarios
-
-- **Happy path:** Run against a 2-phase plan with simple phases. Both phases execute inline, compliance checks pass, verification agents find nothing. All checkboxes updated.
-- **Complex phase delegation:** Run against a plan with a phase that has 5 steps touching 7 files. Verify a subagent is spawned instead of inline execution.
-- **Resume from partial:** Manually check off phase 1 in a 3-phase plan, invoke the skill. Verify it starts at phase 2.
-- **Compliance failure + fix:** Run against a plan where a step is ambiguous enough that the implementation might drift. Verify compliance checker catches it, fix is attempted, and re-check runs.
-- **Compliance failure + stop:** Force a deviation that can't be fixed in one pass. Verify the skill stops with a clear report instead of continuing.
-- **Plan validation:** Invoke with a plan file missing the `## Progress` section. Verify the skill reports the gap and stops.
-- **Auto-discovery:** Invoke without a path in a repo that has exactly one `.plan.md` file. Verify it finds and uses it.
-- **Multiple plans:** Invoke without a path in a repo with multiple `.plan.md` files. Verify it lists them and asks which one.

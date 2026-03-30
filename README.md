@@ -32,6 +32,7 @@ claude plugin install oddkit@oddkit
 | `address-feedback` | Address PR review comments: fetch, evaluate, fix, and respond autonomously. |
 | `plan` | Build an implementation plan through recon, Q&A, and stress-testing. |
 | `skill-converter` | Import an external skill and rewrite it as an oddkit skill (minimal, concise, no ceremony or AI fluff). |
+| `implement` | Execute a plan phase by phase with compliance checks and verification. |
 | `update` | Pull the latest oddkit from GitHub and refresh the local cache. |
 
 ## Skill Details
@@ -56,6 +57,14 @@ claude plugin install oddkit@oddkit
 ```
 /oddkit:plan add caching to the API layer
 /oddkit:plan --out docs/plans/caching.plan.md
+```
+
+**`implement`** — Execute an implementation plan phase by phase with compliance checks and verification.
+
+```
+/oddkit:implement docs/plans/caching.plan.md
+/oddkit:implement docs/plans/caching.plan.md --yolo
+/oddkit:implement                              # auto-finds .plan.md files
 ```
 
 **`skill-converter`** — Convert external skills into oddkit skills. Analyzes methodology, asks just enough to gauge intent, produces a compact skill.
