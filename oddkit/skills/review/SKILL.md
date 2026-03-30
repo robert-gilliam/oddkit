@@ -3,7 +3,7 @@ name: review
 description: >
   Review code or plans. No args = local self-review. PR number = GitHub review with confirmation.
   Use when the user wants to review a PR, self-review before pushing, or says /oddkit:review.
-argument-hint: "[#PR or branch] [--yolo]"
+argument-hint: "[#PR or branch or file path] [--yolo]"
 ---
 
 # Review
@@ -13,12 +13,22 @@ Review changes using parallel subagents. Auto-detects code vs plan content and p
 ## Parse arguments
 
 Extract from `$ARGUMENTS`:
+- **File path**: argument ending in a file extension (`.md`, `.txt`, `.ts`, etc.) or containing `/` without `#` — review a single file directly
 - **PR reference**: `#\d+`, `/pull/\d+`, GitHub URL, or branch name
 - **`--yolo`**: skip confirmation, post directly
 
 No args = local review (terminal only, no GitHub).
+File path = file review (terminal only, no GitHub, no diff).
 
-## Step 1 — Resolve target and get the diff
+## Step 1 — Resolve target and get content
+
+### If file path provided
+
+Read the file. If it doesn't exist, stop: "File not found: {path}"
+
+Store the file contents as `FILE_CONTENT` and the path as `FILE_PATH`.
+
+Skip straight to Step 2 — no diff, no git, no GitHub.
 
 ### If PR reference provided
 
@@ -71,6 +81,16 @@ If diff exceeds 5,000 lines, warn and ask to confirm.
 
 ## Step 2 — Detect content type and spawn agents
 
+### If file path (no diff)
+
+Determine content type from the file extension:
+- **Code** (.ts, .js, .py, .go, .rs, etc.) → code review agents
+- **Plan/docs** (.md, .txt) → plan review agents
+
+Pass `FILE_CONTENT` to the agents instead of a diff. Skip to Step 3.
+
+### If diff
+
 Examine the diff to determine content type:
 
 - **Code**: diff contains source files (.ts, .js, .py, .go, .rs, etc.)
@@ -109,6 +129,13 @@ If multiple agents flagged the same snippet for the same root cause, merge into 
 
 For EVERY finding:
 
+**If reviewing a file (no diff):**
+1. Search `FILE_CONTENT` for the quoted snippet
+2. Check surrounding context in the file
+3. For plan reviews: verify claims against the actual codebase (read referenced files, grep for referenced functions/patterns)
+4. Ask: does this issue actually exist, or did the agent misunderstand?
+
+**If reviewing a diff:**
 1. Read the file at the reported path
 2. Search for the quoted SNIPPET to find the actual line number
 3. Check at least 20 lines of surrounding context
@@ -116,7 +143,7 @@ For EVERY finding:
 5. Ask: does this issue actually exist, or did the agent misunderstand?
 
 **Discard** if:
-- Snippet doesn't exist in the file (hallucinated)
+- Snippet doesn't exist in the file or diff (hallucinated)
 - Issue doesn't exist in the actual code
 - Issue is handled elsewhere (null check upstream, etc.)
 - Concern is theoretical / code path can't be triggered
@@ -132,14 +159,14 @@ If >10 findings for one file, group related ones into block comments.
 
 ## Step 4 — Output results
 
-### Local review (no PR reference)
+### File review or local review (no PR reference)
 
-Print to terminal:
+Print to terminal. For file reviews, replace `{DIFF_STAT}` with `Reviewing: {FILE_PATH}`.
 
 ```
 ## Review — {N} issue(s) found
 
-{DIFF_STAT}
+{DIFF_STAT or file path}
 
 ### BLOCKING ({count})
 

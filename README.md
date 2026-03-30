@@ -40,9 +40,10 @@ claude plugin install oddkit@oddkit
 **`review`** — Review code or plans. Auto-detects content type.
 
 ```
-/oddkit:review              # local self-review
-/oddkit:review #42          # review a PR (confirm before posting)
-/oddkit:review #42 --yolo   # review a PR (post without asking)
+/oddkit:review                    # local self-review
+/oddkit:review #42                # review a PR (confirm before posting)
+/oddkit:review #42 --yolo         # review a PR (post without asking)
+/oddkit:review docs/plans/foo.md  # review a single file (no diff, no GitHub)
 ```
 
 **`address-feedback`** — Address PR review comments: fetch, evaluate, fix, respond.
