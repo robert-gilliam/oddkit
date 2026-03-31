@@ -17,6 +17,9 @@ track state, so the skill can resume if interrupted.
 
 The plan is the source of truth. Follow it. Don't generate plans — that's `/oddkit:plan`'s job.
 
+**Shell rule:** Never combine `cd` and `git` in a single compound bash command (e.g., `cd foo && git diff`).
+Run them as separate tool calls, or use `git -C <path>`. This applies to you and all subagents you spawn.
+
 ## Parse arguments
 
 Extract from `$ARGUMENTS`:
@@ -109,6 +112,9 @@ Use the Agent tool to launch a fresh agent with this handoff:
 > Implement this phase of a plan. Follow the instructions exactly. Do not skip steps,
 > stub implementations, or declare anything out of scope.
 >
+> **Shell rule:** never combine `cd` and `git` in a single compound bash command
+> (e.g., `cd foo && git diff`). Run them as separate tool calls, or use `git -C <path>`.
+>
 > ## Phase to implement
 > <phase section text with all steps>
 >
@@ -143,6 +149,9 @@ Implement phase N: <phase name>
 Spawn a fresh subagent to compare the implementation against the plan:
 
 > Compare this implementation against its plan. Check behavioral intent, not style.
+>
+> **Shell rule:** never combine `cd` and `git` in a single compound bash command.
+> Run them as separate tool calls, or use `git -C <path>`.
 >
 > **Phase description:**
 > <phase section text>
