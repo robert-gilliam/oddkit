@@ -203,9 +203,29 @@ Unless `--yolo`:
 
 #### Post findings
 
-**Default: use `mcp__github_inline_comment__create_inline_comment` if available.**
+**Default: use GitHub MCP review tools if available.**
 
-For each finding, post an inline comment using the MCP tool with `confirmed: true`. Format:
+**1. Create a pending review:**
+
+Call `mcp__plugin_github_github__pull_request_review_write` with:
+- `method`: `"create"`
+- `owner`: `OWNER`, `repo`: `REPO`, `pullNumber`: `PR_NUMBER`
+- `commitID`: `HEAD_SHA`
+- Do NOT pass `event` — omitting it creates a pending review.
+
+**2. Add inline comments to the pending review:**
+
+For each finding, call `mcp__plugin_github_github__add_comment_to_pending_review` with:
+- `owner`, `repo`, `pullNumber`
+- `path`: file path relative to repo root
+- `line`: the line number in the diff
+- `side`: `"RIGHT"`
+- `subjectType`: `"LINE"`
+- `body`: the comment (format below)
+
+For multi-line comments, also pass `startLine` and `startSide: "RIGHT"`.
+
+Comment format:
 
 ```
 **{SEVERITY}** — [{Agent}]
@@ -215,48 +235,38 @@ For each finding, post an inline comment using the MCP tool with `confirmed: tru
 **Why:** {Explanation}
 ```
 
-For small, self-contained fixes, include a committable suggestion block. For larger fixes (6+ lines, structural changes, multi-file), describe the fix without a suggestion block.
+For small, self-contained fixes, include a suggestion block. For larger fixes (6+ lines, structural, multi-file), describe the fix without one.
 
-Post one comment per unique issue. Do not post duplicates.
+One comment per unique issue. No duplicates.
+
+**3. Submit the pending review:**
+
+Call `mcp__plugin_github_github__pull_request_review_write` with:
+- `method`: `"submit_pending"`
+- `owner`: `OWNER`, `repo`: `REPO`, `pullNumber`: `PR_NUMBER`
+- `event`: `"COMMENT"`
+- `body`: `"Reviewed: {N} issue(s) — {B} blocking, {W} warnings. {count} finding(s) removed during verification."`
 
 **Fallback: `gh pr comment` with code links.**
 
-If the MCP inline comment tool is not available, post a single comment on the PR:
+If the MCP review tools are not available, post a single comment on the PR:
 
 ```bash
 gh pr comment <PR_NUMBER> --body "<review body>"
 ```
 
-Format the body with linked code references. Use full SHA links so GitHub renders syntax-highlighted code previews:
+Format with linked code references. Use full SHA links (`https://github.com/{OWNER}/{REPO}/blob/{HEAD_SHA}/{path}#L{start}-L{end}`) so GitHub renders code previews:
 
 ```
-## Automated Review
+**{N} issue(s)** — {B} blocking, {W} warnings
 
-**{N} issue(s) found** ({B} blocking, {W} warnings)
-
-*Reviewed by: {agent names}*
-
----
-
-### 1. {SEVERITY} — {Issue title}
-
-[{file}:{line}](https://github.com/{OWNER}/{REPO}/blob/{HEAD_SHA}/{file}#L{start}-L{end})
-
-{Issue description}
-
+**{SEVERITY}** [{file}:{line}](https://github.com/{OWNER}/{REPO}/blob/{HEAD_SHA}/{file}#L{start}-L{end})
+{Issue}
 **Why:** {Explanation}
-
----
 
 (repeat for each finding)
 
-*{count} finding(s) removed during verification.*
-```
-
-Link format must be exact — full SHA, `#L{start}-L{end}` with at least 1 line of context above and below:
-
-```
-https://github.com/{OWNER}/{REPO}/blob/{HEAD_SHA}/{path}#L{start}-L{end}
+*{count} removed during verification.*
 ```
 
 Report: issues found, discarded count, PR link.
