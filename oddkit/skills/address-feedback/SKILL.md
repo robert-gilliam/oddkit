@@ -36,16 +36,24 @@ Fetch the base branch for comparison.
 
 Store `WORK_DIR` for all subsequent file operations.
 
-## Phase 3 — Fetch unresolved comments
+## Phase 3 — Fetch all comments
+
+Three API endpoints cover the three comment types on a PR:
 
 ```bash
+# Inline review comments (attached to specific lines/files)
 gh api repos/{owner}/{repo}/pulls/{PR_NUMBER}/comments --paginate
+
+# Review bodies (top-level text submitted with Approve/Request Changes)
 gh api repos/{owner}/{repo}/pulls/{PR_NUMBER}/reviews --paginate
+
+# General conversation comments (posted in the PR thread, not tied to a file)
+gh api repos/{owner}/{repo}/issues/{PR_NUMBER}/comments --paginate
 ```
 
-Filter to actionable, unresolved comments. For each, store: `comment_id`, `path`, `line`, `body`, `diff_hunk`, `user.login`.
+Merge all three into a single list. Filter to actionable, unresolved comments. For each, store: `comment_id`, `comment_type` (inline, review, conversation), `path` (if inline), `line` (if inline), `body`, `diff_hunk` (if inline), `user.login`.
 
-Group by file.
+Group inline comments by file. Conversation and review-body comments form a separate "general" group.
 
 ## Phase 4 — Evaluate each comment
 
@@ -118,10 +126,15 @@ Unless `--yolo`, ask: "Push commits and post replies? (yes / adjust / abort)"
 git push origin <HEAD_BRANCH>
 ```
 
-Post replies:
+Post replies using the correct endpoint per comment type:
 
 ```bash
+# Inline review comments — reply in the review thread
 gh api repos/{owner}/{repo}/pulls/{PR_NUMBER}/comments/{comment_id}/replies \
+  --method POST -f body="<reply>"
+
+# Conversation comments — reply in the issue thread
+gh api repos/{owner}/{repo}/issues/{PR_NUMBER}/comments \
   --method POST -f body="<reply>"
 ```
 
