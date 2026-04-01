@@ -100,22 +100,40 @@ If mixed, treat as code review (code agents catch what matters most).
 
 ### Code review → 3 agents in parallel
 
-Spawn `@oddkit:bug-hunter`, `@oddkit:ship-blocker`, `@oddkit:dx-critic` using the Agent tool.
+Spawn `@oddkit:bug-hunter`, `@oddkit:ship-blocker`, `@oddkit:design-critic` using the Agent tool.
 
-Pass each agent:
+**bug-hunter and ship-blocker** get:
 - The diff (use `PR_DIFF` for GitHub reviews, local diff for local reviews)
-- PR description (if available)
 - **For GitHub reviews:** the file list (`PR_FILES`) with this instruction: "Only report findings in these files. These are the files in the PR diff."
 
-Each must quote exact code snippets from the diff for every finding.
+Do NOT pass PR description to bug-hunter or ship-blocker. They are mechanical — diff only.
 
-### Plan review → 4 agents in parallel
+**design-critic** gets:
+- The diff
+- PR description (if available)
+- **For GitHub reviews:** the file list (`PR_FILES`) with the same scoping instruction
+- This framing: "You're reviewing a code change. Here's the diff and the PR description. Search the codebase for existing patterns that could simplify or replace this approach."
 
-Spawn `@oddkit:fact-checker`, `@oddkit:architecture-critic`, `@oddkit:completeness-auditor`, `@oddkit:simplicity-auditor`.
+Each agent must quote exact code snippets from the diff for every finding.
 
-For fact-checker, also read full file contents (not just diff hunks) so it can verify claims against the codebase. Pass all agents the diff, PR description, and for GitHub reviews the file list with the same scoping instruction.
+### Plan review → 3 agents in parallel
 
-Each must quote exact text from the plan for every finding.
+Spawn `@oddkit:fact-checker`, `@oddkit:completeness-auditor`, `@oddkit:design-critic`.
+
+**fact-checker and completeness-auditor** get:
+- The diff
+- PR description (if available)
+- **For GitHub reviews:** the file list with the same scoping instruction
+
+For fact-checker, also read full file contents (not just diff hunks) so it can verify claims against the codebase.
+
+**design-critic** gets:
+- The diff
+- PR description (if available)
+- **For GitHub reviews:** the file list with the same scoping instruction
+- This framing: "You're reviewing an implementation plan. Here's the plan text. Evaluate whether the proposed design is sound, appropriately scoped, and as simple as it can be. Search the codebase for existing patterns that the plan could leverage."
+
+Each agent must quote exact text from the plan for every finding.
 
 ## Step 3 — Collect, deduplicate, verify
 
