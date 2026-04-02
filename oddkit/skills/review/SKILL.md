@@ -109,19 +109,22 @@ If mixed, treat as code review (code agents catch what matters most).
 
 ### Code review → 3 agents in parallel
 
-Spawn `@oddkit:bug-hunter`, `@oddkit:ship-blocker`, `@oddkit:design-critic` using the Agent tool.
+Spawn `@oddkit:correctness`, `@oddkit:intent-checker`, `@oddkit:design-critic` using the Agent tool.
 
-**bug-hunter and ship-blocker** get:
+**All three agents** get:
 - The diff (use `PR_DIFF` for GitHub reviews, local diff for local reviews)
 - **For GitHub reviews:** the file list (`PR_FILES`) with this instruction: "Only report findings in these files. These are the files in the PR diff."
-
-Do NOT pass PR description to bug-hunter or ship-blocker. They are mechanical — diff only.
-
-**design-critic** gets:
-- The diff
-- PR description (if available)
-- **For GitHub reviews:** the file list (`PR_FILES`) with the same scoping instruction
 - **For GitHub reviews:** "Search the codebase at `REVIEW_ROOT` (not the repo root) for all file reads, globs, and greps."
+
+**correctness** also gets:
+- No PR description. It reviews the code mechanically — what breaks, what leaks, what's unsafe.
+
+**intent-checker** also gets:
+- PR description (required — this agent compares intent vs. reality)
+- This framing: "Compare what the PR says it does against what the code actually does. Flag mismatches, unstated changes, and incomplete coverage of stated goals."
+
+**design-critic** also gets:
+- PR description (if available)
 - This framing: "You're reviewing a code change. Here's the diff and the PR description. Search the codebase for existing patterns that could simplify or replace this approach."
 
 Each agent must quote exact code snippets from the diff for every finding.

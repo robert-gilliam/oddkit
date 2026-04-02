@@ -205,11 +205,7 @@ After all phases complete, get the full diff:
 git diff <BASE_COMMIT>..HEAD
 ```
 
-Spawn two agents in parallel on the full diff:
-
-**@oddkit:bug-hunter** — runtime correctness issues in the new code.
-
-**@oddkit:ship-blocker** — user-facing impact and security issues.
+Spawn `@oddkit:correctness` on the full diff — runtime correctness, user-facing impact, and security issues.
 
 Collect findings. Verify each one against the actual code (same process as `/oddkit:review` Step 3b).
 Discard hallucinated or invalid findings.
