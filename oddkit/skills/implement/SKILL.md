@@ -24,7 +24,8 @@ Run them as separate tool calls, or use `git -C <path>`. This applies to you and
 
 Extract from `$ARGUMENTS`:
 - **Plan file path**: positional argument — a path to a `.plan.md` file
-- **`--yolo`**: skip the initial confirmation gate
+- **`--yolo`**: fully autonomous mode — skip all confirmation gates, auto-continue through warnings,
+  and run all subagents with `mode: "bypassPermissions"`. No human input required.
 
 ### Find the plan
 
@@ -57,6 +58,7 @@ Before doing any work, check that the plan is executable:
 4. **Steps are concrete.** Scan each phase's steps. If steps lack file references or specific actions
    (e.g., just "update the service" with no file path), warn: "Phase N has vague steps that may cause drift.
    Consider running `/oddkit:plan` to add specifics. Continue anyway? (yes / abort)"
+   In `--yolo` mode, log the warning and continue.
 
 Parse the plan into:
 - `TITLE` — the H1 heading
@@ -82,6 +84,8 @@ Proceed? (yes / abort)
 
 Unless `--yolo`, wait for confirmation. On abort, stop.
 
+In `--yolo` mode, show the summary but proceed immediately without waiting.
+
 ## Step 3 — Execute phases
 
 For each unchecked phase in Progress order:
@@ -94,7 +98,7 @@ Count the steps (### headings within the phase) and distinct files mentioned.
 - **Complex**: >3 steps OR >5 distinct files → spawn a subagent
 
 If a phase has >8 steps, warn before starting: "Phase N has {count} steps. Consider breaking it down
-with `/oddkit:plan` if execution drifts."
+with `/oddkit:plan` if execution drifts." In `--yolo` mode, log the warning and continue.
 
 ### 3b. Execute the phase
 
@@ -107,7 +111,8 @@ Work through each step in order. Follow the plan's instructions exactly:
 
 **Complex — spawn a subagent.**
 
-Use the Agent tool to launch a fresh agent with this handoff:
+Use the Agent tool to launch a fresh agent with this handoff.
+In `--yolo` mode, set `mode: "bypassPermissions"` on the Agent call.
 
 > Implement this phase of a plan. Follow the instructions exactly. Do not skip steps,
 > stub implementations, or declare anything out of scope.
@@ -135,6 +140,7 @@ If verification fails:
 1. Attempt to fix the issue
 2. Re-run verification
 3. If it fails again, stop: "Phase N verification failed after one fix attempt. Details: <error>"
+   In `--yolo` mode, log the failure and continue to the next phase instead of stopping.
 
 ### 3d. Commit
 
@@ -146,7 +152,8 @@ Implement phase N: <phase name>
 
 ### 3e. Compliance check
 
-Spawn a fresh subagent to compare the implementation against the plan:
+Spawn a fresh subagent to compare the implementation against the plan.
+In `--yolo` mode, set `mode: "bypassPermissions"` on the Agent call.
 
 > Compare this implementation against its plan. Check behavioral intent, not style.
 >
@@ -188,6 +195,7 @@ Spawn a fresh subagent to compare the implementation against the plan:
 3. Re-run the compliance check on the combined diff (`git diff HEAD~2`)
 4. If deviations remain, stop: "Phase N deviates from the plan after one fix attempt.
    Review the report and decide how to proceed."
+   In `--yolo` mode, log the remaining deviations and continue to the next phase instead of stopping.
 
 **On DRIFT-only findings:** Log them in the output but continue.
 
@@ -206,6 +214,7 @@ git diff <BASE_COMMIT>..HEAD
 ```
 
 Spawn `@oddkit:correctness` on the full diff — runtime correctness, user-facing impact, and security issues.
+In `--yolo` mode, set `mode: "bypassPermissions"` on the Agent call.
 
 Collect findings. Verify each one against the actual code (same process as `/oddkit:review` Step 3b).
 Discard hallucinated or invalid findings.
