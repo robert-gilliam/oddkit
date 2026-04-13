@@ -96,7 +96,7 @@ Output from the grader agent. Located at `<variant-dir>/grading.json`.
 }
 ```
 
-**Critical:** The viewer reads exact field names. Expectations must use `text`, `passed`, and `evidence` — not `name`/`met`/`details` or other variants.
+**Critical:** The aggregation script reads exact field names. Expectations must use `text`, `passed`, and `evidence` — not `name`/`met`/`details` or other variants.
 
 ---
 
@@ -179,7 +179,7 @@ Aggregated benchmark output. Located at `<workspace>/iteration-<N>/benchmark.jso
 }
 ```
 
-**Important:** The `configuration` field in each run uses the variant label (e.g., `opus-ultrathink`, `codex-5.4`), not `with_skill`/`without_skill`. The viewer and aggregation script discover configurations dynamically from directory names.
+**Important:** The `configuration` field in each run uses the variant label (e.g., `opus-ultrathink`, `codex-5.4`), not `with_skill`/`without_skill`. The aggregation script discovers configurations dynamically from directory names.
 
 ---
 
@@ -238,28 +238,3 @@ Output from blind comparator. Located at `<workspace>/iteration-<N>/comparison-<
 }
 ```
 
----
-
-## feedback.json
-
-User feedback from the HTML viewer. Located at `<workspace>/iteration-<N>/feedback.json`.
-
-```json
-{
-  "reviews": [
-    {
-      "run_id": "opus-ultrathink-outputs",
-      "feedback": "The plan is thorough but the phases could be more focused",
-      "timestamp": "2026-04-09T15:00:00Z"
-    },
-    {
-      "run_id": "codex-5.4-outputs",
-      "feedback": "",
-      "timestamp": "2026-04-09T15:01:00Z"
-    }
-  ],
-  "status": "complete"
-}
-```
-
-Empty feedback means the user thought the output was fine.

@@ -2,8 +2,8 @@
 name: eval
 description: >
   Run the same task through multiple models, configs, or approaches and compare the results.
-  Creates isolated git worktrees per variant, runs everything in parallel, then grades, benchmarks,
-  and opens an interactive HTML viewer with rubric scores, comparison matrices, and timing data.
+  Creates isolated git worktrees per variant, runs everything in parallel, then grades and benchmarks
+  with rubric scores, blind comparisons, and timing data — all reported in the terminal.
   Use when the user wants to compare models, compare approaches, A/B test implementations, evaluate
   plans across configs, benchmark model performance, or says /oddkit:eval. Also trigger when the user
   says "compare these approaches", "which model is better for this", "run this with and without
@@ -17,7 +17,7 @@ model: opus
 
 Run the same task through multiple variants — different models, thinking modes, or configurations —
 and compare the results. Each variant runs in an isolated git worktree on its own branch. Results
-are graded, benchmarked, and presented in an interactive HTML viewer.
+are graded, blind-compared, benchmarked, and reported in the terminal.
 
 The user describes everything in natural language. Your job is to parse the task and variants,
 set up isolation, run the work, and evaluate the outputs.
@@ -94,8 +94,7 @@ eval-workspace/<eval-name>-<YYYY-MM-DD>/
 │   │   │       ├── grading.json
 │   │   │       └── timing.json
 │   ├── benchmark.json
-│   ├── benchmark.md
-│   └── feedback.json
+│   └── benchmark.md
 ```
 
 This structure matches the aggregation script's expectations: `eval-*/config/run-*/grading.json`.
@@ -287,90 +286,76 @@ The analyzer reads `benchmark.json` and surfaces patterns the aggregate stats mi
 
 The analyzer writes notes as a JSON array of strings. Merge these into `benchmark.json`'s `notes` field.
 
-## Step 10 — Launch the viewer
+## Step 10 — Report results in the terminal
 
-Generate and serve the interactive HTML viewer:
-
-```bash
-nohup python ${CLAUDE_SKILL_DIR}/eval-viewer/generate_review.py \
-  <workspace>/iteration-<N> \
-  --skill-name "<eval-name>" \
-  --benchmark <workspace>/iteration-<N>/benchmark.json \
-  > /dev/null 2>&1 &
-VIEWER_PID=$!
-```
-
-For iteration 2+, also pass `--previous-workspace <workspace>/iteration-<N-1>`.
-
-Tell the user:
-"Results are open in your browser. Two tabs — 'Outputs' lets you compare each variant's work
-and leave feedback, 'Benchmark' shows the quantitative comparison. Come back here when you're done."
-
-### What the user sees
-
-**Outputs tab**: one eval at a time. For each variant:
-- The task prompt
-- Output files rendered inline
-- Blind comparison scores (if available)
-- Grading results (collapsed)
-- Feedback textbox (auto-saves)
-
-**Benchmark tab**: summary table with pass rates, timing, and token usage per variant.
-Per-assertion breakdowns. Analyst observations.
-
-## Step 11 — Read feedback and iterate
-
-When the user returns, read `feedback.json`:
-
-```json
-{
-  "reviews": [
-    {"run_id": "variant-label", "feedback": "...", "timestamp": "..."}
-  ],
-  "status": "complete"
-}
-```
-
-Empty feedback means the user thought it was fine.
-
-Kill the viewer:
-```bash
-kill $VIEWER_PID 2>/dev/null
-```
-
-### If the user wants to iterate
-
-1. Adjust the task prompt or assertions based on feedback
-2. Create `iteration-<N+1>/` in the same workspace
-3. Set up fresh worktrees (reuse branches or create new ones)
-4. Rerun all variants
-5. Launch the viewer with `--previous-workspace` pointing at the previous iteration
-6. Repeat until the user is satisfied
-
-### If the user is done
-
-Report the final results:
+Assemble and print a single terminal report. Pull from `benchmark.md`, the blind comparison
+files, and the analyst notes in `benchmark.json`.
 
 ```
-## Eval Complete — <eval-name>
+## Eval Complete — <eval-name> (iteration <N>)
 
-**Variants tested:** <list>
-**Winner:** <variant with highest overall score>
+**Task:** <task prompt, one line>
+**Variants:** <label1>, <label2>, ...
 
 ### Scores
-| Variant | Pass Rate | Time | Tokens | Overall |
-|---------|-----------|------|--------|---------|
-| <each variant's stats> |
+| Variant | Pass Rate | Time | Tokens | Blind Score |
+|---------|-----------|------|--------|-------------|
+| <label> | <x/y>     | <s>  | <n>    | <overall>   |
 
-### Key Findings
-<analyst notes, comparison highlights>
+Blind Score is the comparator's overall rubric score (content + structure, /10) averaged
+across the pairwise comparisons this variant appeared in. Pull from
+`comparison-<A>-vs-<B>.json` and map the A/B labels back to variant names.
+
+### Blind Comparison Winners
+- <labelA> vs <labelB>: <winning label> (<scoreA> vs <scoreB>) — <one-line reasoning>
+
+### Assertion Breakdown
+List only assertions where variants diverged. Skip the ones everyone passed.
+
+### Analyst Observations
+<bulleted notes from benchmark.json "notes">
+
+### Output Locations
+- Workspace: <workspace-path>/iteration-<N>/
+- Per-variant outputs: eval-0/<label>/run-1/outputs/
+- Benchmark: benchmark.md
+- Comparisons: comparison-*.json
 
 ### Branches
-<list of persistent branches for each variant>
+- eval/<eval-name>/<label1>
+- eval/<eval-name>/<label2>
 
 To continue from the winning variant:
   git checkout eval/<eval-name>/<winner-label>
 ```
+
+Keep it tight. The detail lives in the files — the terminal report is the summary.
+
+## Step 11 — Offer to iterate
+
+After the report, ask the user whether they want to iterate:
+
+```
+Want to iterate?
+1. Refine the task prompt and rerun
+2. Adjust assertions and re-grade (no rerun)
+3. Add another variant to compare
+4. Done
+```
+
+### If the user wants to iterate
+
+1. Adjust the task prompt, assertions, or variant list based on their direction
+2. Create `iteration-<N+1>/` in the same workspace
+3. Set up fresh worktrees (reuse branches or create new ones)
+4. Rerun the steps that changed (full rerun for option 1 or 3; re-grade only for option 2)
+5. Print the new iteration's report and call out diffs against the previous one where useful
+6. Repeat until the user is done
+
+### If the user is done
+
+Nothing more to do. Worktrees can be cleaned up (see Cleanup) but branches and the workspace
+stay so the user can inspect and cherry-pick.
 
 ## Cleanup
 
@@ -390,6 +375,4 @@ Agents and scripts bundled with this skill:
 - `agents/comparator.md` — blind head-to-head comparison of two outputs
 - `agents/analyzer.md` — surfaces patterns in benchmark data
 - `scripts/aggregate_benchmark.py` — aggregates grading results into benchmark stats
-- `eval-viewer/generate_review.py` — generates and serves the interactive HTML review viewer
-- `eval-viewer/viewer.html` — the HTML template for the viewer
 - `references/schemas.md` — JSON schemas for all data files (grading, benchmark, comparison, etc.)
