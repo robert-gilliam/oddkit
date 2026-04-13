@@ -278,7 +278,9 @@ Call `mcp__plugin_github_github__pull_request_review_write` with:
 - `method`: `"submit_pending"`
 - `owner`: `OWNER`, `repo`: `REPO`, `pullNumber`: `PR_NUMBER`
 - `event`: `"COMMENT"`
-- `body`: `"Reviewed: {N} issue(s) — {B} blocking, {W} warnings. {count} finding(s) removed during verification."`
+- `body`: one or two sentences of specific, genuine praise about the PR (something that actually works well — a clean abstraction, good test coverage, thoughtful edge case handling, etc.), followed by the stats line: `"Reviewed: {N} issue(s) — {B} blocking, {W} warnings. {count} finding(s) removed during verification."`
+
+Keep the praise concrete and concise. No generic "great work!" Name the thing you liked.
 
 **Fallback: `gh pr comment` with code links.**
 
@@ -288,9 +290,11 @@ If the MCP review tools are not available, post a single comment on the PR:
 gh pr comment <PR_NUMBER> --body "<review body>"
 ```
 
-Format with linked code references. Use full SHA links (`https://github.com/{OWNER}/{REPO}/blob/{HEAD_SHA}/{path}#L{start}-L{end}`) so GitHub renders code previews:
+Format with linked code references. Use full SHA links (`https://github.com/{OWNER}/{REPO}/blob/{HEAD_SHA}/{path}#L{start}-L{end}`) so GitHub renders code previews. Lead with one or two sentences of specific, genuine praise (name a thing that works — no generic "great work!"):
 
 ```
+{One or two sentences of specific praise about the PR.}
+
 **{N} issue(s)** — {B} blocking, {W} warnings
 
 **{SEVERITY}** [{file}:{line}](https://github.com/{OWNER}/{REPO}/blob/{HEAD_SHA}/{file}#L{start}-L{end})
