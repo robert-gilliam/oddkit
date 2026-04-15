@@ -190,6 +190,19 @@ For plan review findings, also apply:
 
 If >10 findings for one file, group related ones into block comments.
 
+### 3d. Recommend
+
+Pick one verdict from the findings:
+- **Ready to merge** — no blocking issues
+- **Fix then merge** — blocking issues are small, localized fixes
+- **Needs reworking** — blocking issues require structural or design changes
+
+Store as `VERDICT`. Map to the GitHub review event:
+- Ready to merge / Fix then merge → `"APPROVE"`
+- Needs reworking → `"COMMENT"`
+
+Store as `REVIEW_EVENT`.
+
 ## Step 4 — Output results
 
 ### File review or local review (no PR reference)
@@ -200,6 +213,8 @@ Print to terminal. For file reviews, replace `{DIFF_STAT}` with `Reviewing: {FIL
 ## Review — {N} issue(s) found
 
 {DIFF_STAT or file path}
+
+**Recommendation:** {VERDICT}.
 
 ### BLOCKING ({count})
 
@@ -221,7 +236,7 @@ Print to terminal. For file reviews, replace `{DIFF_STAT}` with `Reviewing: {FIL
 *{count} finding(s) removed during verification.*
 ```
 
-If no findings: "No issues found. All clear."
+If no findings: "No issues found. All clear. **Recommendation:** {VERDICT}."
 
 Done. No GitHub interaction.
 
@@ -230,8 +245,8 @@ Done. No GitHub interaction.
 #### Confirm before posting
 
 Unless `--yolo`:
-- Show number of findings, severity breakdown, summary table
-- Ask: "Post this review to PR #{PR_NUMBER}? (y/n)"
+- Show number of findings, severity breakdown, summary table, `VERDICT`, and `REVIEW_EVENT`
+- Ask: "Post this review to PR #{PR_NUMBER} as {REVIEW_EVENT}? (y/n)"
 - If declined, show findings locally and stop
 
 #### Post findings
@@ -279,16 +294,19 @@ One comment per unique issue. No duplicates.
 Call `mcp__plugin_github_github__pull_request_review_write` with:
 - `method`: `"submit_pending"`
 - `owner`: `OWNER`, `repo`: `REPO`, `pullNumber`: `PR_NUMBER`
-- `event`: `"COMMENT"`
-- `body`: one or two sentences of specific, genuine praise about the PR (something that actually works well — a clean abstraction, good test coverage, thoughtful edge case handling, etc.), followed by the stats line: `"Reviewed: {N} issue(s) — {B} blocking, {W} warnings. {count} finding(s) removed during verification."`
+- `event`: `REVIEW_EVENT`
+- `body`: one or two sentences of specific, genuine praise about the PR (something that actually works well — a clean abstraction, good test coverage, thoughtful edge case handling, etc.), followed by `"Recommendation: {VERDICT}."`, followed by the stats line: `"Reviewed: {N} issue(s) — {B} blocking, {W} warnings. {count} finding(s) removed during verification."`
 
 Keep the praise concrete and concise. No generic "great work!" Name the thing you liked.
 
-**Fallback: `gh pr comment` with code links.**
+**Fallback: `gh pr review` (or `gh pr comment`) with code links.**
 
-If the MCP review tools are not available, post a single comment on the PR:
+If the MCP review tools are not available:
 
 ```bash
+# If REVIEW_EVENT is APPROVE:
+gh pr review <PR_NUMBER> --approve --body "<review body>"
+# Otherwise:
 gh pr comment <PR_NUMBER> --body "<review body>"
 ```
 
@@ -296,6 +314,8 @@ Format with linked code references. Use full SHA links (`https://github.com/{OWN
 
 ```
 {One or two sentences of specific praise about the PR.}
+
+**Recommendation:** {VERDICT}.
 
 **{N} issue(s)** — {B} blocking, {W} warnings
 
