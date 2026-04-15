@@ -268,6 +268,8 @@ Comment format:
 **Why:** {Explanation}
 ```
 
+Keep it tight — three sentences max across issue and why, no hedging.
+
 For small, self-contained fixes, include a suggestion block. For larger fixes (6+ lines, structural, multi-file), describe the fix without one.
 
 One comment per unique issue. No duplicates.
