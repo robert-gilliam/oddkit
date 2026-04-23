@@ -19,18 +19,25 @@ Extract from `$ARGUMENTS`:
 ## Phase 1 — Identify the PR
 
 ```bash
-gh pr view <ref or current branch> --json number,title,body,headRefName,baseRefName,url
+gh pr view <ref or current branch> --json number,title,body,state,headRefName,baseRefName,url
 ```
 
-Store `PR_NUMBER`, `HEAD_BRANCH`, `BASE_BRANCH`, `PR_URL`.
+Store `PR_NUMBER`, `HEAD_BRANCH`, `BASE_BRANCH`, `PR_URL`, `PR_STATE`.
 
 If no PR found, stop: "No open PR found. Specify a PR number or switch to a branch with an open PR."
+
+If `PR_STATE` is not `OPEN`, stop: "PR #<n> is <state>. Reopen it or pick an open PR."
 
 Verify local branch is up-to-date with origin. If not, stop: "Local branch is not up-to-date with origin. Pull or push first."
 
 ## Phase 2 — Set up workspace
 
-If already on `HEAD_BRANCH`, use current directory. Otherwise create a worktree.
+If the working tree is clean (`git status --porcelain` is empty) and you're already on `HEAD_BRANCH`, use the current directory. Otherwise create a worktree checked out on `HEAD_BRANCH` — never a new branch off main:
+
+```bash
+git fetch origin <HEAD_BRANCH>
+git worktree add .addr-feedback-<timestamp> origin/<HEAD_BRANCH>
+```
 
 Fetch the base branch for comparison.
 
@@ -121,6 +128,14 @@ Unless `--yolo`, ask: "Push commits and post replies? (yes / adjust / abort)"
 - **abort** → stop, local commits remain
 
 ## Phase 7 — Push and respond
+
+Re-check PR state immediately before pushing — it may have closed or merged since Phase 1:
+
+```bash
+gh pr view <PR_NUMBER> --json state
+```
+
+If not `OPEN`, stop: "PR #<n> is <state>. Not pushing. Local commits remain on `HEAD_BRANCH`."
 
 ```bash
 git push origin <HEAD_BRANCH>

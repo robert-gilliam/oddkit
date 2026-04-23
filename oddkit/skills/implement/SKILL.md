@@ -88,6 +88,8 @@ In `--yolo` mode, show the summary but proceed immediately without waiting.
 
 ## Step 3 — Execute phases
 
+Require a clean working tree before starting. If `git status --porcelain` is non-empty, stop: "Working tree has uncommitted changes. Commit, stash, or discard first — per-phase commits would sweep them in."
+
 For each unchecked phase in Progress order:
 
 ### 3a. Assess complexity
