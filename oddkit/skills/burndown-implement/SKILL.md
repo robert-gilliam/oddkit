@@ -1,26 +1,32 @@
 ---
 name: burndown-implement
 description: >
-  Run an autonomous burndown session set up by /oddkit:burndown-plan. Reads the session
-  index, validates each issue's tracking and answered clarifications, then ships PRs in
-  parallel without further human intervention. Use when the user has answered the
-  clarifying-questions files and wants to ship the work — "run the burndown",
-  "implement the burndown", "ship the planned issues", or "/oddkit:burndown-implement".
-  Auto-resumes interrupted sessions; failed issues never block others.
-argument-hint: "[--session <session-id>]"
+  Ship every burndown issue that's ready: scans .oddkit/burndown-issue-tracking/, picks
+  any non-terminal issue with answers filled in (or no questions needed), opens a PR per
+  issue, and posts result comments — without further human intervention. Use when the
+  developer has answered the clarifying-questions files and wants to ship the work — "run
+  the burndown", "implement the burndown", "ship the planned issues", or
+  "/oddkit:burndown-implement". Auto-resumes interrupted issues; failed issues never
+  block others.
 model: sonnet
 ---
 
 # Burndown — Implement
 
-Half two of the autonomous burndown flow. Picks up the session that `/oddkit:burndown-plan`
-created, validates that every issue is ready, then fans out implementation agents — one
+Half two of the autonomous burndown flow. Scans the developer's burndown tracking files,
+picks any issue whose preconditions are met, then fans out implementation agents — one
 worktree per issue, one PR per issue — and posts a result comment to each. No realtime
 questions. Fully resumable.
 
 **Why autonomous.** All decisions live in the per-issue tracking JSON and the answered
-clarifying-questions files. If any issue is missing tracking or has unanswered questions,
-that one issue is skipped and reported. The rest run.
+clarifying-questions files. If an issue isn't ready (unanswered questions, incomplete
+plan), it's left alone and noted in the final report. The rest run.
+
+**No session coupling.** There's no session index file and no `--session` flag. State is
+in `$MAIN_REPO/.oddkit/burndown-issue-tracking/`; this skill scans it and works with
+whatever's there. The developer can run `/oddkit:burndown-plan` multiple times across
+different issue sets — implement picks up everything that's ready, regardless of when it
+was planned.
 
 **Shell rule:** never combine `cd` and `git` in a single compound bash command. Use
 separate calls or `git -C <path>`. Applies to you and every subagent.
@@ -31,81 +37,47 @@ separate calls or `git -C <path>`. Applies to you and every subagent.
 - complex-issue implementation → opus
 - `@oddkit:intent-checker` (within impl agents) → opus (its default)
 
-## Parse arguments
-
-From `$ARGUMENTS`:
-- **`--session <session-id>`** (optional): pick a specific session by ID. If omitted,
-  auto-discover.
-
-## Phase 1 — Locate the session
+## Phase 1 — Scan tracking files and triage
 
 State lives in the developer's current repo's `.oddkit/`. From their current directory:
 ```bash
 MAIN_REPO=$(git -C "$PWD" rev-parse --show-toplevel)
-SESSIONS_DIR="$MAIN_REPO/.oddkit/burndown-sessions"
+TRACKING_DIR="$MAIN_REPO/.oddkit/burndown-issue-tracking"
 ```
 
-If `--session <id>` was provided, the index is `$SESSIONS_DIR/<id>.md`. Verify it exists.
+If `$TRACKING_DIR` is missing or empty: tell the developer to run
+`/oddkit:burndown-plan` first. Exit.
 
-Otherwise auto-discover: list `$SESSIONS_DIR/*.md`, parse each frontmatter `status`, and
-pick the newest whose status is not `complete`. If all sessions are `complete`, pick the
-most recent regardless and announce it clearly.
+List `$TRACKING_DIR/*.json`. For each tracking file, decide what to do based on `phase`:
 
-If `$SESSIONS_DIR` is empty or missing: tell the developer to run `/oddkit:burndown-plan`
-first. Exit.
+- **Terminal** (`done`, `failed`, `blocked`, `already_done`): leave alone. Not part of
+  this run, not in the report.
+- **`awaiting_clarifications`**: read the file at `$MAIN_REPO/<clarifications_file>` (the
+  field is relative to `$MAIN_REPO`). Parse every `### Q` block; each must be followed by
+  a non-empty `[Answer]:` line. "Non-empty" = anything other than whitespace after the
+  colon — `agent's call`, prose, a letter, anything counts.
+  - All answered → flip `phase: "ready"` in tracking, then include in this run.
+  - Any blank → record as **skipped (unanswered)** with the question numbers, and move
+    on. Don't touch the clarifications file. The `[Answer]:` lines are the source of
+    truth; there's no separate status to update.
+- **`ready`**: include in this run.
+- **`implementing` or `implementation_complete`**: a previous run was interrupted. Treat
+  as ready-to-implement and re-spawn the impl agent — it should detect the existing
+  worktree and continue.
+- **`pending` or `reconned`**: plan didn't finish for this issue. Record as **skipped
+  (incomplete plan)** and move on. To recover, the developer deletes the tracking file
+  and re-runs /oddkit:burndown-plan.
 
-If multiple plausible matches with no `--session`: pick the most recent and announce it
-so the developer can override with `--session`.
+After this scan you have:
+- **Run set** — issues this implement run will touch (`ready`, `implementing`,
+  `implementation_complete`)
+- **Skipped (unanswered)** — reported at end
+- **Skipped (incomplete plan)** — reported at end
 
-Read `main_repo` and `session_worktree` from the index frontmatter. The session worktree
-may or may not still exist (it's a plan-time artifact); implement doesn't depend on it.
+Reporting in Phase 6 only covers the run set plus the skipped lists above. Issues
+already in terminal phases from prior runs don't show up.
 
-## Phase 2 — Read the session index and validate
-
-Parse the YAML frontmatter to get the issue list, base branch, session id, etc. Set the
-index `status` to `in_progress` (atomic write).
-
-For each issue listed:
-
-### 2a. Verify tracking file exists
-
-```bash
-test -f "$MAIN_REPO/.oddkit/burndown-issue-tracking/<n>.json"
-```
-
-If missing: log a `skipped: missing-tracking` outcome for this issue and continue. The
-issue is dropped from this run. The final report calls it out.
-
-### 2b. Read tracking; respect terminal phases
-
-Load `<n>.json`. If `phase` is one of `done`, `failed`, `blocked`, `already_done`, the
-issue is in a terminal state from a previous run. Skip work for it; the final report
-includes its status.
-
-### 2c. Validate clarifications (when `needs_clarifications: true`)
-
-If the tracking file says clarifications are needed, read the file at
-`$MAIN_REPO/<clarifications_file>` (the field is relative to `$MAIN_REPO`). Parse every
-`### Q` block; each must be followed by a non-empty `[Answer]:` line. "Non-empty" means
-there's something other than whitespace after the colon — including `agent's call`, prose,
-a letter, anything.
-
-If any answer is blank: skip this issue with outcome `skipped: unanswered-questions:
-Q<n>, Q<m>` and continue. Don't repair; the developer must answer and re-run.
-
-If all answers present: update the clarifications file's frontmatter `status: answered`,
-update tracking `phase: "ready"`, and proceed.
-
-### 2d. Resume detection
-
-If `phase` is `implementing` or `implementation_complete`, a previous run was interrupted
-mid-flight. Treat as ready-to-implement and re-spawn the impl agent — the agent should
-detect the existing worktree and continue.
-
-After Phase 2, you have three buckets:
-- **Skipped** (will report at the end, no work done)
-- **Already done** (will post evidence comments only)
-- **To implement** (real work this run)
+Read `base_branch` from each tracking file (plan recorded it during Phase 3).
 
 ## Phase 3 — Generate plans for complex issues
 
@@ -132,8 +104,8 @@ parallel siblings keep running.
   the next with the predecessor's branch as `<base>`. If the head fails, mark every
   dependent as `phase: "blocked"`, set their tracking accordingly, and skip — don't
   propagate a broken base.
-- **Already done**: post evidence comment (see `references/comments.md`). Set
-  `phase: "already_done"`, `comment_posted: true`. No worktree, no agent.
+- **Already done**: post evidence comment (see `references/comments.md`). Phase is
+  already `already_done` from plan; no worktree, no agent. Skip to Phase 5.
 
 ### Per-issue worktree path
 
@@ -144,7 +116,7 @@ git -C "$MAIN_REPO" fetch origin "$BASE_BRANCH"
 
 Each implementation agent creates its own worktree at:
 ```
-$MAIN_REPO/.oddkit/worktrees/burndown-<session-id>-issue-<n>
+$MAIN_REPO/.oddkit/worktrees/burndown-issue-<n>
 ```
 
 Branch name: `burndown/issue-<n>-<slug>`. Branch off `origin/<base_branch>` (from
@@ -158,14 +130,28 @@ For each issue to implement, spawn an Agent using `references/impl-handoff.md`.
 
 When the agent returns, parse its structured response and write the result fields into
 the tracking file:
-- `phase`: `done` | `failed` | `implementation_complete` (if push happened but PR open
-  failed)
-- `implementation_complete`: true if code+tests done locally
-- `pushed_to_github`: true if branch pushed AND PR opened
+- `phase`: `done` (pushed + PR opened) | `failed` | `implementation_complete` (code+tests
+  passed locally but push or PR open failed; this is a resume target)
 - `pr_url`, `branch`, `worktree`, `tests_status`, `plan_compliance`, `summary`,
   `caveats`, `failure_reason`
 
+Don't add boolean shortcut fields. `phase` plus the explicit results above is enough.
+
 Write the file immediately after each return — don't batch. Resumability depends on this.
+
+### Clean up successful worktrees
+
+Right after writing `phase: "done"`, remove that issue's worktree:
+
+```bash
+git -C "$MAIN_REPO" worktree remove --force "<worktree-path>"
+```
+
+The branch is on origin and the PR is open — there's nothing further to inspect locally.
+For `failed` and `blocked` issues, **leave the worktree in place** so the developer can
+inspect what went wrong. For serialized chains, only clean up after the chain is fully
+done (the dependent agent reads the predecessor's branch name from tracking and pulls
+from origin, so the predecessor's worktree isn't needed once it's pushed).
 
 ## Phase 5 — Post resolution comments
 
@@ -184,16 +170,15 @@ tracking file, write the intended body to
 `$MAIN_REPO/.oddkit/burndown-comments-pending/<n>.md`, and continue. Don't retry inside
 the same run.
 
-On success: set `comment_posted: true` and `updated_at`.
+`comment_error: null` (and the absence of a pending comment file) is the implicit signal
+that the comment posted. No separate `comment_posted` flag.
 
 ## Phase 6 — Finalize and report
 
-Update the index frontmatter `status: complete` (atomic write).
-
-Print:
+Print, scoped to issues this run actually touched:
 
 ```
-## Burndown complete — session <session-id>
+## Burndown complete — <YYYY-MM-DD HH:mm UTC>
 
 ### Shipped ({M})
 - #123 → <PR URL> — tests <pass|fail|skipped>, plan compliance <pass|fail|n/a>
@@ -202,50 +187,47 @@ Print:
 - #789 — evidence comment posted
 
 ### Failed ({K})
-- #456 — <one-line failure reason>. Worktree: <abs path>
+- #456 — <one-line failure reason>. Worktree retained: <abs path>
 
 ### Blocked ({L})
 - #790 — predecessor #789 failed
 
-### Skipped ({Q}) — not run this round
-- #100 — missing tracking file
-- #101 — unanswered questions: Q1, Q3 — fix the file and re-run
+### Skipped — unanswered ({Q})
+- #100 — Q1, Q3 unanswered. File: .oddkit/burndown-clarifying-questions/100.md
 
-### Comments that didn't post ({R})
+### Skipped — incomplete plan ({R})
+- #101 — phase: pending. Delete the tracking file and re-run /oddkit:burndown-plan.
+
+### Comments that didn't post ({S})
 - #555 — <reason>. Hand-post: gh issue comment 555 \
     --body-file $MAIN_REPO/.oddkit/burndown-comments-pending/555.md
 
 ### Next steps
 - Review PRs (consider /oddkit:review <PR>)
-- Address skips by editing the relevant files, then re-run
-  /oddkit:burndown-implement (resumes automatically)
+- Address skips per the instructions above, then re-run /oddkit:burndown-implement
 - For failures: cd into the issue's worktree and inspect; re-run when ready
 ```
 
-Don't auto-clean per-issue worktrees. Failed/blocked issues need them for inspection.
-Cleanup hint: `git worktree remove <worktree>` after a PR is merged or a failure is
-diagnosed.
+Omit any section that has zero entries — keep the report dense.
 
 ## Resume semantics
 
-The session is fully resumable. Re-running `/oddkit:burndown-implement` on the same
-session:
+Implement is fully resumable. Re-running it:
 - Reads each tracking file and respects terminal phases (`done`, `failed`, `blocked`,
   `already_done`) — those issues are skipped this run.
 - Picks up `awaiting_clarifications` issues only if their answers have since been
   filled in.
 - Re-spawns impl agents for issues stuck at `implementing` or `implementation_complete`.
   The agent must detect an existing worktree and continue from current branch state.
-- For failed issues that the developer wants to retry, instruct them to set the issue's
-  `phase` back to `ready` and clear `failure_reason` in the tracking file. Then re-run.
-  (No `--retry` flag — keep the surface area small; editing the tracking file is the
-  retry mechanism.)
+- For failed issues the developer wants to retry: set `phase` back to `ready` and clear
+  `failure_reason` in the tracking file, then re-run. (No `--retry` flag — editing the
+  tracking file is the retry mechanism.)
 
 ## Notes for the implementer
 
 - **State is rooted at `$MAIN_REPO/.oddkit/`.** Tracking, descriptions, clarifications,
-  plans, comments-pending, and the session index all live there. Use absolute paths in
-  every agent prompt.
+  plans, comments-pending. Use absolute paths in every agent prompt. There's no session
+  index file — implement scans tracking JSON.
 - Use `cwd:` / `git -C <path>` instead of `cd` in compound shell commands.
 - Per-issue worktrees branch from `origin/<base_branch>` (refreshed via `git fetch`) by
   default. Serialized chain dependents branch from the predecessor's branch.
@@ -253,6 +235,9 @@ session:
   the lockfile and runs install before tests if needed.
 - Independence is sacred. One issue's failure must never derail another. Only serialized
   chain dependents are blocked when their predecessor fails.
+- `phase` is the only state field. Don't add `pushed_to_github`, `comment_posted`,
+  `implementation_complete` boolean shortcuts — derive from `phase`, `pr_url`, and
+  `comment_error`.
 - Stacked PRs: don't auto-retarget on merge. Leave it as a manual step in the report.
 - File-overlap detection from plan time is heuristic. Real conflicts at PR time are the
   developer's call.

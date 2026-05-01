@@ -21,9 +21,10 @@ Read from `[<main-repo>/.oddkit/burndown-issue-descriptions/<n>.md]`.
 Read from `[<main-repo>/.oddkit/burndown-issue-tracking/<n>-recon.md]`.
 
 ## Clarifications
-Read from `[<main-repo>/.oddkit/burndown-clarifying-questions/<n>-<session>.md]`. Treat
-each `[Answer]:` line as authoritative. If an answer is `agent's call`, choose the most
-reasonable option and note the decision in the plan's "Key Decisions" section.
+Read from `[<main-repo>/.oddkit/burndown-clarifying-questions/<n>.md]` (or `null` if no
+clarifications were needed). Treat each `[Answer]:` line as authoritative. If an answer
+is `agent's call`, choose the most reasonable option and note the decision in the plan's
+"Key Decisions" section.
 
 ## Output path
 Write the plan to `[<main-repo>/.oddkit/burndown-plans/<n>.plan.md]`.

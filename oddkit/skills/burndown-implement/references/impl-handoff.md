@@ -26,10 +26,10 @@ separate calls or `git -C <path>`.
 - Issue description: `[<main-repo>/.oddkit/burndown-issue-descriptions/<n>.md]`
 - Recon: `[<main-repo>/.oddkit/burndown-issue-tracking/<n>-recon.md]`
 - Tracking file (you write progress here): `[<main-repo>/.oddkit/burndown-issue-tracking/<n>.json]`
-- Clarifications: `[<main-repo>/.oddkit/burndown-clarifying-questions/<n>-<session>.md]` or `null`
+- Clarifications: `[<main-repo>/.oddkit/burndown-clarifying-questions/<n>.md]` or `null`
 - Plan: `[<main-repo>/.oddkit/burndown-plans/<n>.plan.md]` or `null` (simple issues — implement from issue + recon + clarifications)
 - Base branch: `[main | <predecessor branch>]`
-- Per-issue worktree to create: `[<main-repo>/.oddkit/worktrees/burndown-<session>-issue-<n>]`
+- Per-issue worktree to create: `[<main-repo>/.oddkit/worktrees/burndown-issue-<n>]`
 - Branch to create: `[burndown/issue-<n>-<slug>]`
 
 ## State updates
@@ -38,11 +38,15 @@ Update the tracking file (`<n>.json`) at every checkpoint. Use atomic writes (wr
 `<n>.json.tmp`, then `mv`). The orchestrator can be re-spawned if interrupted, so the
 file must always be consistent.
 
-Checkpoints (set `phase` and the matching boolean):
+`phase` is the canonical state field. Don't write parallel boolean flags
+(`implementation_complete`, `pushed_to_github`, etc.) — derive from `phase` and the
+explicit result fields.
+
+Checkpoints:
 1. After worktree+branch created → `phase: "implementing"`, `worktree`, `branch`
-2. After code+tests pass locally → `phase: "implementation_complete"`,
-   `implementation_complete: true`, `tests_status`, `plan_compliance`
-3. After push + PR opened → `phase: "done"`, `pushed_to_github: true`, `pr_url`
+2. After code+tests pass locally → `phase: "implementation_complete"`, `tests_status`,
+   `plan_compliance`
+3. After push + PR opened → `phase: "done"`, `pr_url`
 4. On terminal failure → `phase: "failed"`, `failure_reason`
 
 Always update `updated_at` to current ISO UTC timestamp.
@@ -77,7 +81,7 @@ Always update `updated_at` to current ISO UTC timestamp.
    `git diff [base]..HEAD` to verify implementation matches plan intent. On DEVIATION,
    attempt one fix and commit. If deviations remain, mark `failed` and stop before push.
 
-6. **Update tracking** to `implementation_complete` + `implementation_complete: true`.
+6. **Update tracking** to `phase: "implementation_complete"`.
 
 7. **Push.**
    ```bash
@@ -102,7 +106,7 @@ Always update `updated_at` to current ISO UTC timestamp.
    )"
    ```
 
-9. **Update tracking** to `done` + `pushed_to_github: true` + `pr_url`.
+9. **Update tracking** to `phase: "done"` + `pr_url`.
 
 10. **Return** in this exact shape (the orchestrator parses it):
     ```
@@ -123,9 +127,9 @@ Always update `updated_at` to current ISO UTC timestamp.
 If implementation, verification, or push fails, attempt one retry that addresses the
 specific failure (re-read the failing test, fix it, re-run). If the second attempt also
 fails:
-- Update tracking: `phase: "failed"`, `failure_reason: <one-line root cause>`,
-  `implementation_complete: false` (unless code+tests passed but push failed — in which
-  case `implementation_complete: true`, `pushed_to_github: false`).
+- If code+tests passed locally but push or PR open failed → `phase: "implementation_complete"`,
+  `failure_reason: <push/PR error>`. The orchestrator may retry on the next implement run.
+- Otherwise → `phase: "failed"`, `failure_reason: <one-line root cause>`.
 - Return STATUS=failed.
 
 This isolation is crucial: your failure must not affect other parallel issues.

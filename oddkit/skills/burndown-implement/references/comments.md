@@ -77,9 +77,9 @@ was opened.
 **Rationale**
 <one or two sentences from the tracking file's `rationale`>
 
-If this is wrong, reopen the issue and either edit the tracking file's `complexity`
-to `simple`/`complex` and re-run, or run `/oddkit:burndown-plan #<n>` for a fresh
-session.
+If this is wrong, edit the tracking file's `complexity` to `simple`/`complex` and
+re-run, or delete the tracking file and run `/oddkit:burndown-plan #<n>` to plan it
+again.
 EOF
 )"
 ```
