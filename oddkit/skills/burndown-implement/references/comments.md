@@ -2,6 +2,10 @@
 
 The orchestrator posts one comment per issue at the end. Templates by outcome.
 
+If a comment post fails, write the body to
+`$MAIN_REPO/.oddkit/burndown-comments-pending/<n>.md` and set `comment_error` on the
+tracking file. Don't retry inside the same run.
+
 ---
 
 ## Done (PR opened)
@@ -30,7 +34,7 @@ EOF
 gh issue comment <n> --body "$(cat <<'EOF'
 ## Burndown: could not complete
 
-`/oddkit:burndown` attempted this issue but stopped after one retry.
+`/oddkit:burndown-implement` attempted this issue but stopped after one retry.
 
 **What failed**
 <FAILURE_REASON>
@@ -39,7 +43,8 @@ gh issue comment <n> --body "$(cat <<'EOF'
 - Worktree: <WORKTREE>
 - Branch: <BRANCH> (not pushed if STATUS=failed before push)
 
-Resume with `/oddkit:burndown --resume <state-file> --retry <n>` after addressing the cause.
+To retry: edit `.oddkit/burndown-issue-tracking/<n>.json` — set `phase: "ready"` and clear
+`failure_reason` — then re-run `/oddkit:burndown-implement`.
 EOF
 )"
 ```
@@ -51,7 +56,7 @@ gh issue comment <n> --body "$(cat <<'EOF'
 ## Burndown: skipped (blocked)
 
 Skipped because predecessor #<predecessor> failed and this issue shares files with it.
-Resolve #<predecessor> first, then re-run `/oddkit:burndown --resume <state-file>`.
+Resolve #<predecessor> first, then re-run `/oddkit:burndown-implement`.
 EOF
 )"
 ```
@@ -62,23 +67,19 @@ EOF
 gh issue comment <n> --body "$(cat <<'EOF'
 ## Burndown: already complete
 
-Recon for `/oddkit:burndown` found this issue's requirements already satisfied in the
-current codebase. No PR was opened.
+Recon found this issue's requirements already satisfied in the current codebase. No PR
+was opened.
 
 **Evidence**
 - <file:line> — <one-line description>
 - <file:line> — <one-line description>
 
 **Rationale**
-<one or two sentences explaining what recon found>
+<one or two sentences from the tracking file's `rationale`>
 
-If this is wrong, reopen and re-run `/oddkit:burndown #<n>`.
+If this is wrong, reopen the issue and either edit the tracking file's `complexity`
+to `simple`/`complex` and re-run, or run `/oddkit:burndown-plan #<n>` for a fresh
+session.
 EOF
 )"
 ```
-
----
-
-If a comment post fails (network/auth), log `comment_error: <reason>` to the state file and
-continue. Write the intended body to `<main-repo>/.oddkit/burndown-comments-pending/issue-<n>.md`
-so the developer can hand-post it.

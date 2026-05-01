@@ -120,11 +120,12 @@ Write `eval_metadata.json` inside the `eval-0/` directory:
 a sandboxed worktree the subagent can write to. Do NOT create manual worktrees for Claude variants
 — subagents cannot write to `/tmp/` or other paths outside the project sandbox.
 
-**External CLI variants** (codex, gemini) run via Bash and CAN write to `/tmp/`. Create manual
-worktrees for these:
+**External CLI variants** (codex, gemini) run via Bash and write to the project. Create manual
+worktrees for these under `.oddkit/worktrees/eval/`:
 
 ```bash
-git worktree add -b eval/<eval-name>/<variant-label> /tmp/oddkit-eval/<eval-name>/<variant-label> HEAD
+mkdir -p .oddkit/worktrees/eval/<eval-name>
+git worktree add -b eval/<eval-name>/<variant-label> .oddkit/worktrees/eval/<eval-name>/<variant-label> HEAD
 ```
 
 ## Step 3 — Run all variants in parallel
@@ -357,7 +358,7 @@ stay so the user can inspect and cherry-pick.
 
 ## Cleanup
 
-Worktrees in `/tmp/oddkit-eval/` can be cleaned up:
+Worktrees in `.oddkit/worktrees/eval/` can be cleaned up:
 ```bash
 git worktree remove <worktree-path>
 ```

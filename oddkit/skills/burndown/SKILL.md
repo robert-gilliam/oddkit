@@ -46,17 +46,30 @@ locally.
 
 ## Phase 1 — Set up the batch
 
+State lives in the developer's `.oddkit/` (gitignored). Per-issue worktrees go in
+`.oddkit/worktrees/`. Set up:
+
 ```bash
-git rev-parse --show-toplevel
-mkdir -p .burndown-<timestamp>
+MAIN_REPO=$(git rev-parse --show-toplevel)
+BATCH_ID="burndown-$(date -u +%Y-%m-%d-%H%M)"
+STATE_FILE="$MAIN_REPO/.oddkit/burndown-sessions/$BATCH_ID.json"
+mkdir -p "$MAIN_REPO"/.oddkit/{burndown-sessions,burndown-plans,burndown-comments-pending,worktrees}
 ```
 
-Store as `BATCH_DIR`. Write `<BATCH_DIR>/state.json`:
+Detect base branch and refresh:
+```bash
+BASE_BRANCH=$(git -C "$MAIN_REPO" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null \
+  | sed 's|origin/||')
+git -C "$MAIN_REPO" fetch origin "$BASE_BRANCH"
+```
+
+Write `$STATE_FILE`:
 
 ```json
 {
   "batch_id": "burndown-<timestamp>",
   "created_at": "<iso>",
+  "main_repo": "<absolute path>",
   "issues": [
     {"number": 123, "phase": "pending", "worktree": null, "branch": null, "plan": null, "pr": null, "blocked_by": []}
   ],
@@ -66,7 +79,8 @@ Store as `BATCH_DIR`. Write `<BATCH_DIR>/state.json`:
 
 Per-issue `phase`: `pending → recon → classified → planned → implementing → done | failed | blocked | already_done`.
 
-Refresh state after every phase change so `--resume` works.
+Refresh `$STATE_FILE` after every phase change so `--resume` works. Use atomic writes
+(`.tmp` + `mv`).
 
 Fetch each issue:
 ```bash
@@ -144,7 +158,7 @@ For each `complex` issue, spawn an Agent **with `model: sonnet`**. Run all plan-
 agents in parallel. Use the prompt in `references/plan-handoff.md`, substituting issue,
 recon, and clarifications.
 
-Save each plan to `<BATCH_DIR>/plans/issue-<n>.plan.md`. Record path on the issue as `plan`.
+Save each plan to `$MAIN_REPO/.oddkit/burndown-plans/issue-<n>.plan.md`. Record path on the issue as `plan`.
 
 Simple issues skip planning — implemented directly with issue + recon as context.
 
@@ -161,7 +175,7 @@ Show the developer:
 
 ### Parallel cohort ({M})
 - #123 <title> — simple — implement directly
-- #456 <title> — complex — plan: .burndown-<ts>/plans/issue-456.plan.md
+- #456 <title> — complex — plan: .oddkit/burndown-plans/issue-456.plan.md
 
 ### Serialized chain ({K} — share files)
 - #789 <title> — runs first
@@ -179,8 +193,8 @@ Show the developer:
 Proceed? (yes / abort)
 ```
 
-Wait for confirmation unless `--yolo`. On abort, leave `BATCH_DIR` and state in place —
-`--resume` picks up later.
+Wait for confirmation unless `--yolo`. On abort, leave the state file and any worktrees
+in place — `--resume <state-file>` picks up later.
 
 If the developer flags an `already_done` as misclassified, reclassify (re-running plan
 generation if the new classification is `complex`) before fan-out.
@@ -229,13 +243,13 @@ continue. The final report flags issues whose comments didn't post.
 - #100 — recon found existing impl — comment posted
 
 ### Failed ({K})
-- #789 — <one-line reason>. Worktree: .burndown-<ts>/issue-789 — comment posted
+- #789 — <one-line reason>. Worktree: .oddkit/worktrees/<BATCH_ID>-issue-789 — comment posted
 
 ### Blocked ({L})
 - #790 — predecessor #789 failed — comment posted
 
 ### Comments that didn't post ({Q})
-- #456 — <reason>. Hand-post: gh issue comment 456 --body-file <BATCH_DIR>/comments/issue-456.md
+- #456 — <reason>. Hand-post: gh issue comment 456 --body-file .oddkit/burndown-comments-pending/issue-456.md
 
 ### Next steps
 - Review the PRs (consider /oddkit:review <PR>)
@@ -243,11 +257,12 @@ continue. The final report flags issues whose comments didn't post.
 ```
 
 If any comment failed to post, write the intended body to
-`<BATCH_DIR>/comments/issue-<n>.md`. Don't retry comment posts in the same run — flaky
-network shouldn't bounce the whole batch.
+`$MAIN_REPO/.oddkit/burndown-comments-pending/issue-<n>.md`. Don't retry comment posts in
+the same run — flaky network shouldn't bounce the whole batch.
 
 Don't auto-clean worktrees. Failed and blocked issues need them for inspection.
-Cleanup hint: `git worktree remove <BATCH_DIR>/issue-<n>` once a PR is merged.
+Cleanup hint: `git worktree remove .oddkit/worktrees/<BATCH_ID>-issue-<n>` once a PR is
+merged.
 
 ## Resume
 

@@ -35,8 +35,9 @@ Verify local branch is up-to-date with origin. If not, stop: "Local branch is no
 If the working tree is clean (`git status --porcelain` is empty) and you're already on `HEAD_BRANCH`, use the current directory. Otherwise create a worktree checked out on `HEAD_BRANCH` — never a new branch off main:
 
 ```bash
+mkdir -p .oddkit/worktrees
 git fetch origin <HEAD_BRANCH>
-git worktree add .addr-feedback-<timestamp> origin/<HEAD_BRANCH>
+git worktree add .oddkit/worktrees/addr-feedback-<timestamp> origin/<HEAD_BRANCH>
 ```
 
 Fetch the base branch for comparison.

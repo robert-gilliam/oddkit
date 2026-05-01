@@ -30,9 +30,12 @@ separate tool calls, or use `git -C <path>`.
 
 ## Steps
 
-1. Create a worktree at `<BATCH_DIR>/issue-<n>` from `<base>`. New branch: `burndown/issue-<n>-<slug>`.
+1. Create a worktree at `<main-repo>/.oddkit/worktrees/<BATCH_ID>-issue-<n>` from `<base>`.
+   New branch: `burndown/issue-<n>-<slug>`. (For non-chain issues, branch off
+   `origin/<base>` — orchestrator already fetched.)
    ```bash
-   git worktree add <BATCH_DIR>/issue-<n> -b burndown/issue-<n>-<slug> <base>
+   git -C <main-repo> worktree add .oddkit/worktrees/<BATCH_ID>-issue-<n> \
+     -b burndown/issue-<n>-<slug> origin/<base>
    ```
 2. **If a plan exists**, follow it phase by phase like `/oddkit:implement`: execute phase →
    run plan-specified verification → commit `Implement phase N: <name>` → tick the progress
@@ -45,7 +48,8 @@ separate tool calls, or use `git -C <path>`.
    attempt one fix, then commit. If deviations remain, mark the issue `failed` and stop.
 5. Push the branch:
    ```bash
-   git -C <BATCH_DIR>/issue-<n> push -u origin burndown/issue-<n>-<slug>
+   git -C <main-repo>/.oddkit/worktrees/<BATCH_ID>-issue-<n> \
+     push -u origin burndown/issue-<n>-<slug>
    ```
 6. Open the PR. Use conventional-commit type from labels (`bug` → `fix`,
    `feature`/`enhancement` → `feat`, default `chore`):

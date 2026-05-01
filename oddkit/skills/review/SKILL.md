@@ -55,8 +55,9 @@ Use `PR_DIFF` for all analysis. Do NOT use `git diff` for GitHub reviews — loc
 Create a worktree at the PR's head commit so agents search the code as it exists in the PR, not whatever branch you happen to have checked out:
 
 ```bash
+mkdir -p .oddkit/worktrees
 git fetch origin <HEAD_SHA>
-git worktree add .review-<timestamp> <HEAD_SHA> --detach
+git worktree add .oddkit/worktrees/review-<timestamp> <HEAD_SHA> --detach
 ```
 
 Store the worktree path as `REVIEW_ROOT`. All codebase reads (agent searches, verification) must use paths relative to `REVIEW_ROOT`.
@@ -75,8 +76,9 @@ git update-ref refs/heads/main refs/remotes/origin/main
 If `TARGET_REF` is not the current branch, fetch it and create a temporary worktree:
 
 ```bash
+mkdir -p .oddkit/worktrees
 git fetch origin <TARGET_REF>
-git worktree add .review-<timestamp> origin/<TARGET_REF> --detach
+git worktree add .oddkit/worktrees/review-<timestamp> origin/<TARGET_REF> --detach
 ```
 
 ```bash
@@ -283,7 +285,7 @@ Comment format:
 **Why:** {Explanation}
 ```
 
-Keep it tight — three sentences max across issue and why, no hedging.
+Two sentences max across issue and why. State the problem, then the impact. Don't restate the code, don't hedge, don't preface ("This could potentially...", "It might be worth considering...").
 
 For small, self-contained fixes, include a suggestion block. For larger fixes (6+ lines, structural, multi-file), describe the fix without one.
 
@@ -295,9 +297,9 @@ Call `mcp__plugin_github_github__pull_request_review_write` with:
 - `method`: `"submit_pending"`
 - `owner`: `OWNER`, `repo`: `REPO`, `pullNumber`: `PR_NUMBER`
 - `event`: `REVIEW_EVENT`
-- `body`: one or two sentences of specific, genuine praise about the PR (something that actually works well — a clean abstraction, good test coverage, thoughtful edge case handling, etc.), followed by `"Recommendation: {VERDICT}."`, followed by the stats line: `"Reviewed: {N} issue(s) — {B} blocking, {W} warnings. {count} finding(s) removed during verification."`
+- `body`: one sentence of praise naming the concrete thing that works (a clean abstraction, good test coverage, edge case handling), followed by `"Recommendation: {VERDICT}."`, followed by the stats line: `"Reviewed: {N} issue(s) — {B} blocking, {W} warnings. {count} finding(s) removed during verification."`
 
-Keep the praise concrete and concise. No generic "great work!" Name the thing you liked.
+No generic "great work!" — name a specific thing.
 
 **Fallback: `gh pr review` (or `gh pr comment`) with code links.**
 
@@ -310,10 +312,10 @@ gh pr review <PR_NUMBER> --approve --body "<review body>"
 gh pr comment <PR_NUMBER> --body "<review body>"
 ```
 
-Format with linked code references. Use full SHA links (`https://github.com/{OWNER}/{REPO}/blob/{HEAD_SHA}/{path}#L{start}-L{end}`) so GitHub renders code previews. Lead with one or two sentences of specific, genuine praise (name a thing that works — no generic "great work!"):
+Format with linked code references. Use full SHA links (`https://github.com/{OWNER}/{REPO}/blob/{HEAD_SHA}/{path}#L{start}-L{end}`) so GitHub renders code previews. Lead with one sentence of praise naming a specific thing that works:
 
 ```
-{One or two sentences of specific praise about the PR.}
+{One sentence of specific praise.}
 
 **Recommendation:** {VERDICT}.
 
@@ -335,5 +337,5 @@ Report: issues found, discarded count, PR link.
 Remove the temporary worktree created in Step 1:
 
 ```bash
-git worktree remove .review-<timestamp> --force
+git worktree remove .oddkit/worktrees/review-<timestamp> --force
 ```
