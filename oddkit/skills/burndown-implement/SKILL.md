@@ -153,6 +153,26 @@ inspect what went wrong. For serialized chains, only clean up after the chain is
 done (the dependent agent reads the predecessor's branch name from tracking and pulls
 from origin, so the predecessor's worktree isn't needed once it's pushed).
 
+### Archive clarifications on done
+
+Also right after writing `phase: "done"`, move the issue's clarifications file out of
+the active directory:
+
+```bash
+mv -f "$MAIN_REPO/<clarifications_file>" \
+      "$MAIN_REPO/.oddkit/burndown-archive-clarifying-questions/<n>.md"
+```
+
+(`<clarifications_file>` from tracking; skip when it's `null`.) This keeps
+`.oddkit/burndown-clarifying-questions/` showing only outstanding work — answered files
+for shipped issues move to the archive. For `failed` and `blocked`, **leave the
+clarifications file in place** so a retry has the answers ready. `already_done` issues
+have no clarifications file.
+
+If a file with the same name already exists in the archive (rare — only happens after a
+re-plan + re-ship cycle on the same issue), `mv -f` overwrites it. The most recent
+shipped version is what matters.
+
 ## Phase 5 — Post resolution comments
 
 The orchestrator (you) posts every comment. Never the impl agent. This keeps formatting

@@ -70,7 +70,7 @@ git -C "$MAIN_REPO" fetch origin "$BASE_BRANCH"
 
 Initialize state directories in the **main repo's** `.oddkit/` (gitignored, branch-independent):
 ```bash
-mkdir -p "$MAIN_REPO"/.oddkit/{burndown-issue-tracking,burndown-issue-descriptions,burndown-clarifying-questions,burndown-plans,burndown-comments-pending,worktrees}
+mkdir -p "$MAIN_REPO"/.oddkit/{burndown-issue-tracking,burndown-issue-descriptions,burndown-clarifying-questions,burndown-archive-clarifying-questions,burndown-plans,burndown-comments-pending,worktrees}
 ```
 
 State files always live in `$MAIN_REPO/.oddkit/` — never inside any worktree. The recon
@@ -86,8 +86,10 @@ overwriting would erase that work.
 
 Tell the developer in the handoff:
 > Issue #N is already planned (phase: <phase>). Run /oddkit:burndown-implement to ship,
-> or delete `.oddkit/burndown-issue-tracking/<n>.json` and the matching clarifications
-> file under `.oddkit/burndown-clarifying-questions/` to re-plan.
+> or delete `.oddkit/burndown-issue-tracking/<n>.json` (and the matching file under
+> `.oddkit/burndown-clarifying-questions/`, if it's still there) to re-plan. Implement
+> archives shipped clarifications to `.oddkit/burndown-archive-clarifying-questions/`,
+> so for already-shipped issues only the tracking JSON needs to go.
 
 If every supplied issue is already planned, print the handoff and stop — no recon
 worktree needed.
