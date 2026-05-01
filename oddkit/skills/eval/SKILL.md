@@ -116,19 +116,17 @@ Write `eval_metadata.json` inside the `eval-0/` directory:
 
 ### Worktrees
 
-For each variant, create an isolated git worktree and branch:
+**Claude variants** use the Agent tool's built-in `isolation: "worktree"` parameter, which creates
+a sandboxed worktree the subagent can write to. Do NOT create manual worktrees for Claude variants
+— subagents cannot write to `/tmp/` or other paths outside the project sandbox.
+
+**External CLI variants** (codex, gemini) run via Bash and write to the project. Create manual
+worktrees for these under `.oddkit/worktrees/eval/`:
 
 ```bash
-git worktree add -b eval/<eval-name>/<variant-label> <worktree-path> HEAD
+mkdir -p .oddkit/worktrees/eval/<eval-name>
+git worktree add -b eval/<eval-name>/<variant-label> .oddkit/worktrees/eval/<eval-name>/<variant-label> HEAD
 ```
-
-The worktree path should be a temporary location outside the main repo:
-
-```bash
-/tmp/oddkit-eval/<eval-name>/<variant-label>
-```
-
-Use `/tmp` for worktrees to keep the project directory clean — only results land in `eval-workspace/`.
 
 ## Step 3 — Run all variants in parallel
 
@@ -138,19 +136,20 @@ Run them in the background so you can draft assertions while they execute.
 
 ### Claude variant
 
-```
-Execute this task in the worktree at <worktree-path>:
+Invoke via the Agent tool with `isolation: "worktree"` and `mode: "bypassPermissions"`:
 
+```
 Task: <the task prompt>
 
-Work entirely within this directory. Save all meaningful output files to:
+Save all meaningful output files to:
 <workspace>/iteration-<N>/eval-0/<variant-label>/run-1/outputs/
 
 When done, write a brief summary of what you produced to:
 <workspace>/iteration-<N>/eval-0/<variant-label>/run-1/outputs/summary.md
 ```
 
-Invoke via the Agent tool with `model` set appropriately.
+Set `model` appropriately. The `isolation: "worktree"` parameter creates a sandboxed worktree
+automatically — the subagent works in it and can read/write files without permission issues.
 For ultrathink variants, include in the prompt: "Use extended thinking. Think deeply and thoroughly."
 For non-ultrathink variants, include: "Work efficiently and directly."
 
@@ -359,7 +358,7 @@ stay so the user can inspect and cherry-pick.
 
 ## Cleanup
 
-Worktrees in `/tmp/oddkit-eval/` can be cleaned up:
+Worktrees in `.oddkit/worktrees/eval/` can be cleaned up:
 ```bash
 git worktree remove <worktree-path>
 ```
