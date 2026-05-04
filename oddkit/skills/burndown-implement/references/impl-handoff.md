@@ -73,9 +73,23 @@ Always update `updated_at` to current ISO UTC timestamp.
    - **Without a plan**: implement directly from issue + recon + clarifications. Commit
      once with a clear message.
 
-4. **Test.** Run the project's test command (from `package.json`, `Makefile`,
-   `pyproject.toml`, or repo conventions). If unclear, run typecheck/build instead and
-   note that.
+4. **Verify locally — match what CI runs.** Don't push code that CI will reject. Detect
+   every verification command the project exposes and run them all:
+   - `package.json` scripts: `lint`, `typecheck` (or `tsc`), `test`, `build`, plus any
+     `check`/`ci`/`verify` aggregator script.
+   - `Makefile` targets: `lint`, `typecheck`, `test`, `build`, `check`, `ci`.
+   - `pyproject.toml` / `tox.ini` / `noxfile.py`: ruff/flake8/black, mypy/pyright,
+     pytest, build.
+   - Other ecosystems: detect by lockfile/config (`go vet` + `go test`, `cargo clippy` +
+     `cargo test`, `bundle exec rubocop` + `bundle exec rspec`, etc.).
+
+   Run every command that exists. Capture the exact command + pass/fail for each in your
+   return summary. **If any command fails, do not push.** Treat it the same as a failing
+   test: attempt one targeted fix, re-run the full set, and on second failure mark
+   `phase: "failed"` with `failure_reason` naming the failing command.
+
+   If the project genuinely has no verification commands (rare), note that explicitly in
+   the return summary.
 
 5. **Verify intent (complex only).** Spawn `@oddkit:intent-checker` on
    `git diff [base]..HEAD` to verify implementation matches plan intent. On DEVIATION,
@@ -100,7 +114,7 @@ Always update `updated_at` to current ISO UTC timestamp.
    <2-4 bullets describing what changed>
 
    ## Verification
-   - Tests: <pass/fail/skipped + command used>
+   - Local checks: <one line per command run, e.g. "lint ✓, typecheck ✓, test ✓, build ✓">
    - Plan compliance: <pass/n-a + notes>
    EOF
    )"
@@ -114,7 +128,7 @@ Always update `updated_at` to current ISO UTC timestamp.
     PR_URL: <url or "none">
     BRANCH: <branch name>
     WORKTREE: <absolute path>
-    TESTS: pass | fail | skipped (<command used>)
+    TESTS: pass | fail | skipped (one line per check run, e.g. "lint: pnpm lint ✓; typecheck: pnpm tsc ✓; test: pnpm test ✓; build: pnpm build ✓")
     PLAN_COMPLIANCE: pass | fail | n/a
     SUMMARY: <2-4 bullets, what changed at a behavior level>
     CAVEATS: <one line per caveat, or "none">

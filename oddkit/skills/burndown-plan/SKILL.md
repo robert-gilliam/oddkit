@@ -9,7 +9,7 @@ description: >
   these issues", "draft burndown questions for #X #Y", or "/oddkit:burndown-plan". Always
   pick this over the interactive /oddkit:burndown when async clarification beats a
   realtime Q&A.
-argument-hint: "<issue refs...>"
+argument-hint: "[--base <branch>] <issue refs...>"
 model: sonnet
 ---
 
@@ -40,6 +40,10 @@ separate calls or `git -C <path>`. Applies to you and every subagent.
 ## Parse arguments
 
 From `$ARGUMENTS`:
+- **`--base <branch>`** (optional): override the base branch used for recon and per-issue
+  worktrees. Defaults to the repo's default branch (whatever `origin/HEAD` resolves to,
+  falling back to `main`, then `master`). The value is validated against `origin` after
+  fetching; an unknown branch aborts the run.
 - **Issue refs** (positional): `#\d+`, bare numbers, or GitHub issue URLs.
 
 If no refs, ask once: "Which issues should I plan? Paste numbers or URLs." Then proceed.
@@ -55,17 +59,26 @@ RUN_ID=$(date -u +%Y-%m-%d-%H%M)
 RECON_WORKTREE="$MAIN_REPO/.oddkit/worktrees/burndown-recon-$RUN_ID"
 ```
 
-Detect base branch:
+Refresh all refs from origin first so any `--base` value is validated against current
+remote state, not stale local refs:
 ```bash
+git -C "$MAIN_REPO" fetch origin --prune
+```
+
+Resolve the base branch. Use `--base` if supplied, otherwise auto-detect:
+```bash
+# If --base <branch> was passed, BASE_BRANCH=<branch>
+# Otherwise:
 BASE_BRANCH=$(git -C "$MAIN_REPO" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null \
   | sed 's|origin/||')
 # Fallback to main, then master.
 ```
 
-Fetch the latest base. Recon must see what's actually on `origin/<base>`, not whatever the
-developer has checked out:
+Verify the base exists on origin. Refuse to proceed with a non-existent base — surface a
+clear error mentioning the value the developer passed (or that was auto-detected):
 ```bash
-git -C "$MAIN_REPO" fetch origin "$BASE_BRANCH"
+git -C "$MAIN_REPO" rev-parse --verify "origin/$BASE_BRANCH" >/dev/null 2>&1 \
+  || { echo "Base branch 'origin/$BASE_BRANCH' not found on origin. Aborting."; exit 1; }
 ```
 
 Initialize state directories in the **main repo's** `.oddkit/` (gitignored, branch-independent):
@@ -132,7 +145,9 @@ implement time).
 
 ## Phase 3 — Initialize tracking files
 
-For each issue, write `$MAIN_REPO/.oddkit/burndown-issue-tracking/<n>.json`:
+For each issue, write `$MAIN_REPO/.oddkit/burndown-issue-tracking/<n>.json`. Use the
+resolved `$BASE_BRANCH` from Phase 1 — the same value for every issue in this run, so
+implement can branch off the right base:
 
 ```json
 {

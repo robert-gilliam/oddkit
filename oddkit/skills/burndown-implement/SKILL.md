@@ -48,6 +48,12 @@ TRACKING_DIR="$MAIN_REPO/.oddkit/burndown-issue-tracking"
 If `$TRACKING_DIR` is missing or empty: tell the developer to run
 `/oddkit:burndown-plan` first. Exit.
 
+Refresh all refs from origin so per-issue worktrees branch off current remote state, not
+stale local refs. One fetch covers every `base_branch` recorded across tracking files:
+```bash
+git -C "$MAIN_REPO" fetch origin --prune
+```
+
 List `$TRACKING_DIR/*.json`. For each tracking file, decide what to do based on `phase`:
 
 - **Terminal** (`done`, `failed`, `blocked`, `already_done`): leave alone. Not part of
@@ -109,12 +115,8 @@ parallel siblings keep running.
 
 ### Per-issue worktree path
 
-Before spawning impl agents, refresh the base:
-```bash
-git -C "$MAIN_REPO" fetch origin "$BASE_BRANCH"
-```
-
-Each implementation agent creates its own worktree at:
+Refs were refreshed in Phase 1, so every `origin/<base_branch>` is current. Each
+implementation agent creates its own worktree at:
 ```
 $MAIN_REPO/.oddkit/worktrees/burndown-issue-<n>
 ```
