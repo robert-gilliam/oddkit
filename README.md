@@ -32,6 +32,8 @@ claude plugin install oddkit@oddkit
 | `address-feedback` | Address PR review comments: fetch, evaluate, fix, and respond autonomously. |
 | `plan` | Build an implementation plan through recon, Q&A, and stress-testing. |
 | `implement` | Execute a plan phase by phase with compliance checks and verification. |
+| `burndown-plan` | Recon a batch of GitHub issues in parallel and drop clarifying-question files for the developer to answer offline. |
+| `burndown-implement` | Ship every burndown issue that's ready: one worktree per issue, one PR per issue, no realtime questions. |
 | `skill-converter` | Import an external skill and rewrite it as an oddkit skill (minimal, concise, no ceremony or AI fluff). |
 | `update` | Pull the latest oddkit from GitHub and refresh the local cache. |
 
@@ -66,6 +68,19 @@ claude plugin install oddkit@oddkit
 /oddkit:implement docs/plans/caching.plan.md
 /oddkit:implement docs/plans/caching.plan.md --yolo
 /oddkit:implement                              # auto-finds .plan.md files
+```
+
+**`burndown-plan`** — Recon a batch of GitHub issues in parallel, classify complexity, and write clarifying-question files for the developer to answer offline. State lives in `.oddkit/` (gitignored, branch-independent). Pairs with `/oddkit:burndown-implement`.
+
+```
+/oddkit:burndown-plan #123 #456 #789
+/oddkit:burndown-plan --base develop #123 #456
+```
+
+**`burndown-implement`** — Scan `.oddkit/burndown-issue-tracking/` and ship every issue whose questions are answered (or didn't need any). One worktree per issue, one PR per issue. Fully resumable — re-invoke any time after interruption.
+
+```
+/oddkit:burndown-implement
 ```
 
 **`skill-converter`** — Convert external skills into oddkit skills. Analyzes methodology, asks just enough to gauge intent, produces a compact skill.

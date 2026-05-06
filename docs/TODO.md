@@ -62,8 +62,7 @@ Planned skills (not yet built):
 - [ ] `retro` — extract lessons from recently completed tasks, append reusable rules to CLAUDE.md with deduplication
 - [ ] `skill-converter` — import an external skill and rewrite it as an oddkit skill (minimal, concise, no ceremony or AI fluff)
 - [ ] `polish` — run `review` on the current (or specified) branch, fix blocking issues, repeat until clean, then run linting/tests/CI and fix failures until everything passes
-- [~] `burndown` — multi-agent orchestration over a list of GitHub issues. Recon all → batched Q&A → fan out one worktree per issue → tests + plan-compliance check → PR per issue (`Closes #N`). Auto-serializes file-overlapping issues into stacked PRs. Resumable via `--resume`. v1 drafted, untested.
-- [~] `burndown-plan` + `burndown-implement` — async split of `burndown`. plan creates an isolated session worktree, recons, and writes per-issue clarifying-question files. implement auto-discovers the session, validates, and ships PRs unattended. Drafted, untested.
+- [x] `burndown-plan` + `burndown-implement` — multi-agent orchestration over a list of GitHub issues, async-split. plan recons, classifies, and writes per-issue clarifying-question files. implement scans tracking files and ships PRs unattended (one worktree per issue, one PR per issue). Auto-serializes file-overlapping issues into stacked PRs. Fully resumable. Replaces the original interactive `burndown`.
 
 ## 8. Future-Proofing
 
