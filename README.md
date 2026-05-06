@@ -32,8 +32,7 @@ claude plugin install oddkit@oddkit
 | `address-feedback` | Address PR review comments: fetch, evaluate, fix, and respond autonomously. |
 | `plan` | Build an implementation plan through recon, Q&A, and stress-testing. |
 | `implement` | Execute a plan phase by phase with compliance checks and verification. |
-| `burndown-plan` | Recon a batch of GitHub issues in parallel and drop clarifying-question files for the developer to answer offline. |
-| `burndown-implement` | Ship every burndown issue that's ready: one worktree per issue, one PR per issue, no realtime questions. |
+| `burndown-plan` + `burndown-implement` | Burn down a batch of GitHub issues. `plan` recons in parallel and writes clarifying-question files; answer them offline, then `implement` ships one worktree + one PR per issue. |
 | `skill-converter` | Import an external skill and rewrite it as an oddkit skill (minimal, concise, no ceremony or AI fluff). |
 | `update` | Pull the latest oddkit from GitHub and refresh the local cache. |
 
@@ -70,17 +69,16 @@ claude plugin install oddkit@oddkit
 /oddkit:implement                              # auto-finds .plan.md files
 ```
 
-**`burndown-plan`** — Recon a batch of GitHub issues in parallel, classify complexity, and write clarifying-question files for the developer to answer offline. State lives in `.oddkit/` (gitignored, branch-independent). Pairs with `/oddkit:burndown-implement`.
+**`burndown-plan` + `burndown-implement`** — Burn down a batch of GitHub issues async. Run `plan` first to recon and produce per-issue clarifying-question files. Answer them in your editor. Run `implement` to ship: one worktree per issue, one PR per issue, no realtime questions. State lives in `.oddkit/` (gitignored, branch-independent). Fully resumable.
 
 ```
 /oddkit:burndown-plan #123 #456 #789
-/oddkit:burndown-plan --base develop #123 #456
-```
-
-**`burndown-implement`** — Scan `.oddkit/burndown-issue-tracking/` and ship every issue whose questions are answered (or didn't need any). One worktree per issue, one PR per issue. Fully resumable — re-invoke any time after interruption.
-
-```
+  → answer questions in .oddkit/burndown-clarifying-questions/<n>.md
 /oddkit:burndown-implement
+```
+
+```
+/oddkit:burndown-plan --base develop #123 #456   # override the base branch
 ```
 
 **`skill-converter`** — Convert external skills into oddkit skills. Analyzes methodology, asks just enough to gauge intent, produces a compact skill.
