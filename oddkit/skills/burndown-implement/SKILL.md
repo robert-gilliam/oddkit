@@ -67,16 +67,25 @@ List `$TRACKING_DIR/*.json`. For each tracking file, decide what to do based on 
     on. Don't touch the clarifications file. The `[Answer]:` lines are the source of
     truth; there's no separate status to update.
 - **`ready`**: include in this run.
-- **`implementing` or `implementation_complete`**: a previous run was interrupted. Treat
-  as ready-to-implement and re-spawn the impl agent — it should detect the existing
-  worktree and continue.
+- **`implementing`**: a previous run was interrupted mid-implementation — or another
+  process is still running it right now. **Default: skip.** Re-spawning would race a
+  live agent. Collect every `implementing` issue first, then before any fan-out (Phase
+  3+) ask the developer **once** whether to re-spawn them — single batch prompt, default
+  No. If the developer says no (or doesn't answer), record each as **skipped
+  (in-progress)** and leave the tracking file untouched. If yes, include them in the run
+  set; the impl agent will detect the existing worktree and continue.
+- **`implementation_complete`**: implementation finished but push or PR open failed.
+  Re-spawn the impl agent — it will detect the existing worktree and retry the final
+  steps. (No prompt: the work itself isn't in flight.)
 - **`pending` or `reconned`**: plan didn't finish for this issue. Record as **skipped
   (incomplete plan)** and move on. To recover, the developer deletes the tracking file
   and re-runs /oddkit:burndown-plan.
 
 After this scan you have:
-- **Run set** — issues this implement run will touch (`ready`, `implementing`,
-  `implementation_complete`)
+- **Run set** — issues this implement run will touch (`ready`,
+  `implementation_complete`, plus any `implementing` the developer opted in to)
+- **Skipped (in-progress)** — `implementing` issues the developer did not opt to
+  re-spawn; reported at end
 - **Skipped (unanswered)** — reported at end
 - **Skipped (incomplete plan)** — reported at end
 
@@ -98,7 +107,8 @@ Simple issues skip planning — implemented directly from issue + recon + clarif
 
 ## Phase 4 — Fan out implementation
 
-The orchestrator never asks the developer anything from this point on. Each impl agent
+The only prompt in the whole flow is the in-progress re-spawn question from Phase 1.
+From here on the orchestrator never asks the developer anything else. Each impl agent
 owns its issue end-to-end. Failures are isolated: an issue that fails reports back, but
 parallel siblings keep running.
 
@@ -214,6 +224,10 @@ Print, scoped to issues this run actually touched:
 ### Blocked ({L})
 - #790 — predecessor #789 failed
 
+### Skipped — in progress ({I})
+- #321 — phase: implementing. Worktree: <abs path>. Re-run and approve the re-spawn
+  prompt to resume, or set phase to `ready` in the tracking file.
+
 ### Skipped — unanswered ({Q})
 - #100 — Q1, Q3 unanswered. File: .oddkit/burndown-clarifying-questions/100.md
 
@@ -239,8 +253,11 @@ Implement is fully resumable. Re-running it:
   `already_done`) — those issues are skipped this run.
 - Picks up `awaiting_clarifications` issues only if their answers have since been
   filled in.
-- Re-spawns impl agents for issues stuck at `implementing` or `implementation_complete`.
-  The agent must detect an existing worktree and continue from current branch state.
+- For `implementing` issues, prompts the developer once before re-spawning (default:
+  skip). This avoids racing a live agent that may still be running. Approving the
+  prompt re-spawns the impl agent, which detects the existing worktree and continues.
+- Re-spawns impl agents for issues stuck at `implementation_complete` without a prompt
+  — the implementation finished, only the push/PR open needs retrying.
 - For failed issues the developer wants to retry: set `phase` back to `ready` and clear
   `failure_reason` in the tracking file, then re-run. (No `--retry` flag — editing the
   tracking file is the retry mechanism.)
