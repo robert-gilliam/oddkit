@@ -123,7 +123,9 @@ Path conventions for everything that follows:
   but tell them to write outputs to absolute paths under `$MAIN_REPO/.oddkit/`.
 - **Don't `cd`** — use `cwd:` arguments or `git -C <path>`.
 
-## Phase 2 — Fetch and cache issue descriptions
+## Phase 2 — Fetch issue descriptions and open PRs
+
+### Issue descriptions
 
 For each issue:
 ```bash
@@ -142,6 +144,47 @@ Format: a level-1 heading with the title, a metadata block (URL, labels, assigne
 state), then the body, then a `## Comments` section if non-empty. This is the canonical
 copy of the issue — burndown-implement reads from here, not from `gh` (no network at
 implement time).
+
+### Open PRs (one fetch per batch)
+
+Open PRs are shared context for every issue — fetch them once here, not per recon agent.
+The result feeds Phase 4 (recon prompts) and Phase 5 (overlap heuristic):
+
+```bash
+gh pr list --state open \
+  --json number,title,headRefName,body,files,updatedAt \
+  --limit 100
+```
+
+Slim the result into a cache file. Body is trimmed to a single line (~150 chars, first
+sentence or first line), `files` keeps only the path strings:
+
+```
+$MAIN_REPO/.oddkit/burndown-open-prs.json
+```
+
+Shape:
+```json
+{
+  "fetched_at": "<iso utc>",
+  "prs": [
+    {
+      "number": 7,
+      "title": "Refactor frobnicator",
+      "headRefName": "frob-refactor",
+      "files": ["src/frobnicator.ts", "test/frobnicator.test.ts"],
+      "body_summary": "<one line, ~150 chars>",
+      "updatedAt": "<iso utc>"
+    }
+  ]
+}
+```
+
+If `prs` is empty, log "no open PRs — base branch defaults to main for all issues" and
+skip the open-PR logic in Phases 4–6. Tracking JSON's `base_branch` stays at the resolved
+default; no Base branch section is added to clarifications files.
+
+The file is transient — Phase 7 deletes it alongside the recon worktree.
 
 ## Phase 3 — Initialize tracking files
 
@@ -166,6 +209,7 @@ implement can branch off the right base:
   "branch": null,
   "base_branch": "main",
   "plan_file": null,
+  "pr_suggestion": null,
   "pr_url": null,
   "comment_error": null,
   "failure_reason": null,
@@ -204,13 +248,39 @@ For each issue, spawn `@oddkit:code-scout` and `@oddkit:impact-scout` via the Ag
 - Read code from `$RECON_WORKTREE` (pass it as `cwd`) so they see fresh `origin/<base>`.
 - Write any output files to absolute paths under `$MAIN_REPO/.oddkit/`.
 
+### Open-PR context for every recon prompt
+
+Append a compact open-PR block to each recon agent's prompt, built from
+`$MAIN_REPO/.oddkit/burndown-open-prs.json` (cached in Phase 2). If `prs` is empty, omit
+the whole block. Otherwise:
+
+```
+## Open PRs in this repo (file-overlap context)
+
+- PR #7 "Refactor frobnicator" (head: frob-refactor) — files: src/frobnicator.ts, test/frobnicator.test.ts. Body: "<one line>"
+- PR #12 "Auth rewrite" (head: auth-rewrite) — files: src/auth/session.ts, src/auth/middleware.ts. Body: "<one line>"
+
+If the files you identify as this issue's touch set intersect with any PR's files, run
+`gh pr view <n>` to confirm conceptual overlap, then include a "Likely PR overlap"
+section in your output:
+
+## Likely PR overlap
+- PR #N (head: <ref>) — <one line: what likely overlaps and why it matters>
+
+If no overlap, omit the section.
+```
+
+This is bonus context — the orchestrator still computes file overlap mechanically in
+Phase 5. The recon agent's note (if any) gets folded into the Base branch section's
+explanation in Phase 6.
+
 Run all `2 * len(issues)` calls in one message.
 
 When agents return, write a 2-3 line `recon_summary` into each tracking file: where the
 work lands, what pattern to follow. Save full recon output as
 `$MAIN_REPO/.oddkit/burndown-issue-tracking/<n>-recon.md` for reference at implement time.
 
-## Phase 5 — Classify and detect file overlap
+## Phase 5 — Classify and detect overlap
 
 ### Classify (you, inline)
 
@@ -233,26 +303,59 @@ Build `file_path -> [issue_numbers]` from recon "Relevant Files" / "Dependencies
 touched by 2+ issues form a serialized chain (stacked PRs). Order = input order unless
 recon shows a real dependency. Record `blocked_by` on affected issues.
 
+### Detect open-PR overlap (per issue)
+
+Skip if `burndown-open-prs.json` has no PRs. Otherwise, for each issue:
+
+1. Build `issue_touch_set` from the union of paths in recon's "Relevant Files" and
+   "Dependencies" sections. Normalize to repo-relative paths.
+2. For each cached PR, compute `intersection = issue_touch_set ∩ pr.files`. A PR is
+   *relevant* if `intersection` is non-empty.
+3. Pick the suggestion:
+   - 0 relevant PRs → `pr_suggestion = null`.
+   - 1+ relevant PRs → pick the one with the largest `updatedAt` (most recently updated).
+     Intersection size is not a tiebreaker — recency wins.
+4. Write `pr_suggestion` to tracking JSON when non-null:
+   ```json
+   "pr_suggestion": {
+     "pr_number": 7,
+     "head_ref_name": "frob-refactor",
+     "title": "Refactor frobnicator",
+     "overlap_files": ["src/frobnicator.ts"]
+   }
+   ```
+
+`base_branch` in tracking JSON is *not* changed here — it stays at the resolved
+`$BASE_BRANCH` from Phase 1. The dev's answer (or the pre-filled suggestion they accept)
+gets baked into `base_branch` at implement time when answers are parsed.
+
+Surface only direct overlaps. No transitive stacking detection (PR-on-PR-on-PR). If the
+dev wants chains, they handle it manually by editing the answer.
+
 ## Phase 6 — Write clarifying-questions files (one per issue that needs them)
 
 This is the whole point. One file per issue, multiple choice, `[Answer]:` after each
 question. The developer fills them in offline.
 
-### Decide whether an issue needs questions
+### Decide whether an issue needs a clarifications file
 
-Skip when recon + issue body fully define the work. Sharper questions beat blanket
-coverage. Ask only when:
+Write one when **any** of these is true:
 - Ambiguous business logic
 - Branching design (pattern A vs B, both plausible)
 - Scope uncertainty (does X include Y?)
 - Unresolved edge cases
+- `pr_suggestion != null` (recon detected open-PR overlap — surface the stacking choice)
 
-`already_done` issues: no questions. The evidence is in the tracking file and the
-handoff summary; the developer can sanity-check before running implement.
+Skip when recon + issue body fully define the work *and* there's no PR overlap to
+surface. Sharper questions beat blanket coverage.
 
-`simple` issues with clear acceptance criteria: usually no questions.
+`already_done` issues: no clarifications file regardless of PR overlap. The evidence is
+in the tracking file and the handoff summary; the developer can sanity-check before
+running implement.
 
-Cap 3-5 questions per issue when needed.
+`simple` issues with clear acceptance criteria and no PR overlap: no file.
+
+Cap content questions at 3-5 when needed. The Base branch section is in addition.
 
 ### File path
 
@@ -307,6 +410,18 @@ language. Distinct from the recon summary below, which is about where the work l
 
 <2-3 line recon summary: where the work lands, what pattern to follow, what's ambiguous.>
 
+## Base branch
+
+Which branch should this issue be implemented on top of?
+
+- `<default base>` (default) — start fresh from the default base
+- `<headRefName>` — stack on top of PR #<n>: "<PR title>"
+  Overlap: <comma-separated overlapping files>
+  Why: <one-line explanation: which files overlap and what's likely affected.
+        Include any extra context the recon agent surfaced under "Likely PR overlap".>
+
+[Answer]: <pre-filled with headRefName when pr_suggestion != null, otherwise the default base>
+
 ## How to answer
 
 For each question, write your choice on the `[Answer]:` line. Letter (`A`), option text,
@@ -336,6 +451,30 @@ the PR body.
 The frontmatter has no `status` field. The `[Answer]:` lines are the source of truth —
 implement decides "answered" by parsing them. A separate status would just go stale the
 moment the developer typed an answer.
+
+### Rendering the Base branch section
+
+Two shapes, depending on `pr_suggestion`:
+
+**With suggestion** (`pr_suggestion != null`): list both options, pre-fill the
+`[Answer]:` with the suggested `head_ref_name`, and write a one-line "Why" using the
+`overlap_files` plus any recon-agent note from "Likely PR overlap".
+
+**No suggestion** (`pr_suggestion == null`): single-option list, no "Overlap" / "Why"
+lines, `[Answer]:` pre-filled with the default base:
+
+```markdown
+## Base branch
+
+Which branch should this issue be implemented on top of?
+
+- `main` (default) — start fresh from main
+
+[Answer]: main
+```
+
+The Base branch section is always present in a clarifications file. Consistency makes
+it easy to spot when the dev has overridden the pre-fill.
 
 After writing, set on the issue's tracking file:
 - `clarifications_file: ".oddkit/burndown-clarifying-questions/<n>.md"` (relative to main repo)
@@ -379,6 +518,12 @@ State: <main-repo>/.oddkit/
 ### Serialized chains
 - **#123 → #456** — share `src/exporter.ts`. #456 stacks on #123's branch.
 
+### Stacking suggestions pre-filled
+- **#123** → suggested base: `frob-refactor` (PR #7) — overlap: `src/frobnicator.ts`
+- **#456** → suggested base: `auth-rewrite` (PR #12) — overlap: `src/auth/session.ts`
+
+(Omit this section entirely when no issue in the run has a `pr_suggestion`.)
+
 ### Skipped — already planned
 - **#321** — phase: ready. Run /oddkit:burndown-implement to ship, or delete the
   tracking file to re-plan.
@@ -394,14 +539,16 @@ issue whose questions are answered (or didn't need any). Resumable: re-invoke an
 after interruption.
 ```
 
-Then remove the recon worktree:
+Then remove the recon worktree and the transient open-PR cache:
 
 ```bash
 git -C "$MAIN_REPO" worktree remove --force "$RECON_WORKTREE"
+rm -f "$MAIN_REPO/.oddkit/burndown-open-prs.json"
 ```
 
-The recon outputs (`<n>-recon.md`) are saved under `.oddkit/`. The worktree itself has
-no further purpose.
+The recon outputs (`<n>-recon.md`) are saved under `.oddkit/`. The recon worktree and
+open-PR cache have no further purpose — every per-issue suggestion is durable in
+tracking JSON's `pr_suggestion` and in the clarifications file.
 
 Stop. Don't start implementation.
 

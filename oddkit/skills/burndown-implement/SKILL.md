@@ -59,13 +59,39 @@ List `$TRACKING_DIR/*.json`. For each tracking file, decide what to do based on 
 - **Terminal** (`done`, `failed`, `blocked`, `already_done`): leave alone. Not part of
   this run, not in the report.
 - **`awaiting_clarifications`**: read the file at `$MAIN_REPO/<clarifications_file>` (the
-  field is relative to `$MAIN_REPO`). Parse every `### Q` block; each must be followed by
-  a non-empty `[Answer]:` line. "Non-empty" = anything other than whitespace after the
-  colon — `agent's call`, prose, a letter, anything counts.
-  - All answered → flip `phase: "ready"` in tracking, then include in this run.
-  - Any blank → record as **skipped (unanswered)** with the question numbers, and move
-    on. Don't touch the clarifications file. The `[Answer]:` lines are the source of
-    truth; there's no separate status to update.
+  field is relative to `$MAIN_REPO`). Collect every `[Answer]:` line — from each `### Q`
+  block and (if present) from the `## Base branch` section. All must be non-empty.
+  "Non-empty" = anything other than whitespace after the colon — `agent's call`, prose,
+  a letter, anything counts.
+
+  - **Any blank** (including a blank Base branch answer) → record as **skipped
+    (unanswered)** with the question identifiers (e.g. `Q1, Q3` or `Base branch`), and
+    move on. Don't touch the clarifications file or the tracking file's `base_branch`.
+    The `[Answer]:` lines are the source of truth; there's no separate status to update.
+  - **All answered** → resolve and validate the Base branch first (see below), then
+    only on success flip `phase: "ready"` and include in this run.
+
+  **Resolving the Base branch answer.** Compute the would-be value, validate, then
+  commit both writes atomically. Never half-update.
+
+  Compute:
+  - No `## Base branch` section in the file → use tracking's existing `base_branch`
+    (what plan wrote). This case exists for clarifications files written before this
+    section was introduced; new plans always include it.
+  - Answer is `agent's call` (case-insensitive, exact phrase after trim) → use
+    tracking's existing `base_branch`.
+  - Anything else → strip whitespace; that's the candidate value.
+
+  Validate the candidate against origin:
+  ```bash
+  git -C "$MAIN_REPO" rev-parse --verify "origin/<candidate>" >/dev/null 2>&1
+  ```
+  - Valid → write `base_branch: <candidate>` and `phase: "ready"` to tracking in a
+    single atomic write. Include in this run.
+  - Invalid → record as **skipped (invalid base branch)** with the value and the source
+    (clarifications answer or plan-time default). Leave tracking untouched — phase
+    stays `awaiting_clarifications` so the dev sees it as still-actionable. Don't fan
+    out an impl agent against a base that doesn't exist on origin.
 - **`ready`**: include in this run.
 - **`implementing`**: a previous run was interrupted mid-implementation — or another
   process is still running it right now. **Default: skip.** Re-spawning would race a
@@ -87,12 +113,14 @@ After this scan you have:
 - **Skipped (in-progress)** — `implementing` issues the developer did not opt to
   re-spawn; reported at end
 - **Skipped (unanswered)** — reported at end
+- **Skipped (invalid base branch)** — reported at end
 - **Skipped (incomplete plan)** — reported at end
 
 Reporting in Phase 6 only covers the run set plus the skipped lists above. Issues
 already in terminal phases from prior runs don't show up.
 
-Read `base_branch` from each tracking file (plan recorded it during Phase 3).
+After the scan, each run-set issue has its final `base_branch` set in tracking JSON —
+either from plan's default or from the clarifications answer just resolved above.
 
 ## Phase 3 — Generate plans for complex issues
 
@@ -230,6 +258,10 @@ Print, scoped to issues this run actually touched:
 
 ### Skipped — unanswered ({Q})
 - #100 — Q1, Q3 unanswered. File: .oddkit/burndown-clarifying-questions/100.md
+
+### Skipped — invalid base branch ({B})
+- #200 — base `feature-old` not on origin (from clarifications answer). Edit
+  .oddkit/burndown-clarifying-questions/200.md and re-run.
 
 ### Skipped — incomplete plan ({R})
 - #101 — phase: pending. Delete the tracking file and re-run /oddkit:burndown-plan.
