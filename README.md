@@ -29,6 +29,7 @@ claude plugin install oddkit@oddkit
 | Skill | What it does |
 |-------|-------------|
 | `review` | Review code, plans, or PRs from local or remote branches. Auto-detects content type. Capable of autonomously posting reviews on GitHub. |
+| `vet-prs` | Fast triage gate across a batch of open PRs. One Sonnet agent per PR grades scope, intent, and smell. Posts a short comment on each PR. Use before deep review when you have a pile. |
 | `address-feedback` | Address PR review comments: fetch, evaluate, fix, and respond autonomously. |
 | `plan` | Build an implementation plan through recon, Q&A, and stress-testing. |
 | `implement` | Execute a plan phase by phase with compliance checks and verification. |
@@ -45,6 +46,14 @@ claude plugin install oddkit@oddkit
 /oddkit:review #42                # review a PR (confirm before posting)
 /oddkit:review #42 --yolo         # review a PR (post without asking)
 /oddkit:review docs/plans/foo.md  # review a single file (no diff, no GitHub)
+```
+
+**`vet-prs`** — Triage a batch of open PRs in parallel. Each PR gets three grades — Scope (S/M/L), Intent (✓/⚠️/✗), Smell (clean/iffy/red) — so you can pick which ones deserve a full `/oddkit:review`. Posts a short comment on each PR (upserts on re-run).
+
+```
+/oddkit:vet-prs                       # vet every open PR in the repo
+/oddkit:vet-prs #12 #14 #19           # vet a specific list
+/oddkit:vet-prs --yolo                # skip the post-comments confirmation
 ```
 
 **`address-feedback`** — Address PR review comments: fetch, evaluate, fix, respond.

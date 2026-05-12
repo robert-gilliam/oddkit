@@ -63,6 +63,7 @@ Planned skills (not yet built):
 - [ ] `skill-converter` — import an external skill and rewrite it as an oddkit skill (minimal, concise, no ceremony or AI fluff)
 - [ ] `polish` — run `review` on the current (or specified) branch, fix blocking issues, repeat until clean, then run linting/tests/CI and fix failures until everything passes
 - [x] `burndown-plan` + `burndown-implement` — multi-agent orchestration over a list of GitHub issues, async-split. plan recons, classifies, and writes per-issue clarifying-question files. implement scans tracking files and ships PRs unattended (one worktree per issue, one PR per issue). Auto-serializes file-overlapping issues into stacked PRs. Fully resumable. Replaces the original interactive `burndown`.
+- [x] `vet-prs` — fast parallel triage gate for a batch of open PRs. One Sonnet agent per PR grades scope, intent, and smell. Posts an upsertable comment on each PR. Use before sinking tokens into `/oddkit:review` on a pile.
 
 ## 8. Future-Proofing
 
