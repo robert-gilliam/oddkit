@@ -62,6 +62,24 @@ Companion fields on the `ship` object:
 - `feedback_done_at` (iso utc) — set when Phase 6 completes for this PR
 - `failure_reason` (string) — set if `ship.phase == "ship_failed"`
 
+## Startup checklist
+
+**Before touching any files or running any commands**, create a task for each phase so
+you track remaining work and don't stop early:
+
+```
+TaskCreate: "burndown-ship Phase 2 — run burndown-implement"
+TaskCreate: "burndown-ship Phase 3 — classify new PRs"
+TaskCreate: "burndown-ship Phase 4 — vet PRs"
+TaskCreate: "burndown-ship Phase 5 — deep review"
+TaskCreate: "burndown-ship Phase 6 — address feedback"
+TaskCreate: "burndown-ship Phase 7 — print summary"
+```
+
+Mark each task done only when that phase actually completes. **burndown-implement's
+`## burndown-implement done` report is NOT your completion signal — it is a sub-skill
+handoff. You must complete every phase through Phase 7 before this skill is done.**
+
 ## Phase 0 — Preflight
 
 ```bash
@@ -137,11 +155,18 @@ Skill(skill: "oddkit:burndown-implement", args: "--yolo")
 Wait for it to return. It may take a long time — that's fine, it manages its own
 parallelism. Don't try to monitor it from outside.
 
+**CRITICAL:** When burndown-implement returns and prints its `## burndown-implement done`
+report, **do not stop**. That report is a sub-skill handoff, not your final answer.
+Mark Phase 2's task done and **immediately proceed to Phase 3** — unless one of the
+explicit exit conditions below applies.
+
 If burndown-implement reports zero issues touched:
 - **Case C:** the run set is empty. Delete `$PENDING_FILE` and print "Nothing to ship —
   no issues were ready for `/oddkit:burndown-implement`." Exit.
 - **Case B:** there are still in-progress ship issues from the previous invocation.
   Delete `$PENDING_FILE` and jump directly to Phase 4 — don't exit.
+
+Otherwise (at least one issue was touched): proceed to Phase 3 immediately.
 
 ## Phase 3 — Classify newly-created PRs
 
@@ -351,6 +376,10 @@ cases, exit with a clear message and don't try to "make progress" anyway.
 
 ## Notes for the implementer
 
+- **The most common failure mode is stopping after burndown-implement returns.** The
+  sub-skill prints a `## burndown-implement done` report — this is a handoff, not the
+  final answer. Phases 3–7 (classify, vet, review, feedback, summary) are
+  burndown-ship's own work. You must complete them all before this skill is done.
 - **All sub-skill invocations go through the Skill tool**, not through Bash or Agent.
   This keeps the user's experience consistent — slash commands and Skill invocations
   funnel through the same loaders.

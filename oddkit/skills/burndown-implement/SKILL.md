@@ -264,7 +264,7 @@ that the comment posted. No separate `comment_posted` flag.
 Print, scoped to issues this run actually touched:
 
 ```
-## Burndown complete — <YYYY-MM-DD HH:mm UTC>
+## burndown-implement done — <YYYY-MM-DD HH:mm UTC>
 
 ### Shipped ({M})
 - #123 → <PR URL> — tests <pass|fail|skipped>, plan compliance <pass|fail|n/a>
@@ -303,6 +303,11 @@ Print, scoped to issues this run actually touched:
 ```
 
 Omit any section that has zero entries — keep the report dense.
+
+**If invoked by burndown-ship:** this `## burndown-implement done` report is your
+internal completion summary only — not the final answer. Return immediately to the
+burndown-ship orchestrator. It has Phases 3–7 (classify, vet, review, feedback,
+summary) still to run. Do not present this report as the end of the session.
 
 ## Resume semantics
 
