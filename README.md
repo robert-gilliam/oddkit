@@ -34,6 +34,7 @@ claude plugin install oddkit@oddkit
 | `plan` | Build an implementation plan through recon, Q&A, and stress-testing. |
 | `implement` | Execute a plan phase by phase with compliance checks and verification. |
 | `burndown-plan` + `burndown-implement` | Burn down a batch of GitHub issues. `plan` recons in parallel and writes clarifying-question files; answer them offline, then `implement` ships one worktree + one PR per issue. |
+| `burndown-ship` | Fully autonomous burndown pipeline: implement → vet → route per PR (clean = done, iffy = address feedback, red = review + address feedback). One command, walk away. Resumable. |
 | `skill-converter` | Import an external skill and rewrite it as an oddkit skill (minimal, concise, no ceremony or AI fluff). |
 | `update` | Pull the latest oddkit from GitHub and refresh the local cache. |
 
@@ -88,6 +89,12 @@ claude plugin install oddkit@oddkit
 
 ```
 /oddkit:burndown-plan --base develop #123 #456   # override the base branch
+```
+
+**`burndown-ship`** — End-to-end autonomous shipping for a planned burndown. Runs `burndown-implement`, vets every PR it just created, then routes each: clean PRs are done, iffy small/medium PRs go through `address-feedback`, red or large/iffy PRs go through `review` then `address-feedback`. Every sub-skill is invoked with `--yolo`. Resumable — state lives in each issue's existing tracking file. Use after answering clarifying questions when you want to ship hands-off.
+
+```
+/oddkit:burndown-ship
 ```
 
 **`skill-converter`** — Convert external skills into oddkit skills. Analyzes methodology, asks just enough to gauge intent, produces a compact skill.

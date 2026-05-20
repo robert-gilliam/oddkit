@@ -8,6 +8,7 @@ description: >
   the burndown", "implement the burndown", "ship the planned issues", or
   "/oddkit:burndown-implement". Auto-resumes interrupted issues; failed issues never
   block others.
+argument-hint: "[--yolo]"
 model: sonnet
 ---
 
@@ -17,6 +18,16 @@ Half two of the autonomous burndown flow. Scans the developer's burndown trackin
 picks any issue whose preconditions are met, then fans out implementation agents — one
 worktree per issue, one PR per issue — and posts a result comment to each. No realtime
 questions. Fully resumable.
+
+## Parse arguments
+
+From `$ARGUMENTS`:
+- **`--yolo`** (optional): fully autonomous mode. Skips the one human prompt this skill
+  has (Phase 1's in-progress re-spawn question) by using its default of "No, don't
+  re-spawn." Set automatically when invoked from `/oddkit:burndown-ship`. Default is
+  Off — i.e., the skill prompts as documented below.
+
+Unknown args are ignored (this skill takes no positional arguments).
 
 **Why autonomous.** All decisions live in the per-issue tracking JSON and the answered
 clarifying-questions files. If an issue isn't ready (unanswered questions, incomplete
@@ -88,10 +99,20 @@ List `$TRACKING_DIR/*.json`. For each tracking file, decide what to do based on 
   ```
   - Valid → write `base_branch: <candidate>` and `phase: "ready"` to tracking in a
     single atomic write. Include in this run.
-  - Invalid → record as **skipped (invalid base branch)** with the value and the source
+  - Invalid → Before giving up, check whether this was a stacked PR whose base branch
+    was merged and deleted. Query for a merged PR from that branch:
+    ```bash
+    gh pr list --state merged --head "<candidate>" --json baseRefName --limit 1
+    ```
+    If a merged PR is found, take its `baseRefName` as the new candidate and re-run the
+    `rev-parse --verify` check against origin. If valid, write `base_branch: <parent>`
+    and `phase: "ready"` to tracking and include in this run. The stacked base was
+    merged; the parent is the correct target.
+
+    If no merged PR is found, or the resolved parent also doesn't exist on origin →
+    record as **skipped (invalid base branch)** with the value and the source
     (clarifications answer or plan-time default). Leave tracking untouched — phase
-    stays `awaiting_clarifications` so the dev sees it as still-actionable. Don't fan
-    out an impl agent against a base that doesn't exist on origin.
+    stays `awaiting_clarifications` so the dev sees it as still-actionable.
 - **`ready`**: include in this run.
 - **`implementing`**: a previous run was interrupted mid-implementation — or another
   process is still running it right now. **Default: skip.** Re-spawning would race a
@@ -100,6 +121,11 @@ List `$TRACKING_DIR/*.json`. For each tracking file, decide what to do based on 
   No. If the developer says no (or doesn't answer), record each as **skipped
   (in-progress)** and leave the tracking file untouched. If yes, include them in the run
   set; the impl agent will detect the existing worktree and continue.
+
+  **Under `--yolo`:** skip the prompt entirely and use the default (No / don't re-spawn).
+  Record every `implementing` issue as **skipped (in-progress)**. Rationale: a live
+  agent race would corrupt state; the safe call is to leave them alone and let the
+  developer resolve manually.
 - **`implementation_complete`**: implementation finished but push or PR open failed.
   Re-spawn the impl agent — it will detect the existing worktree and retry the final
   steps. (No prompt: the work itself isn't in flight.)

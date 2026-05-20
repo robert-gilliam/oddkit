@@ -37,7 +37,11 @@ per-PR Agent call.
 From `$ARGUMENTS`:
 - **PR refs** (positional, optional): `#\d+`, bare numbers, or GitHub PR URLs. If
   omitted, vet **all open PRs in the current repo**.
-- **`--yolo`** (optional): skip the "post comments?" confirmation.
+- **`--yolo`** (optional): fully autonomous mode. Skips every interactive prompt this
+  skill would otherwise show — the >30-PR confirmation (Phase 1), the "already
+  approved/vetted" override prompt (Phase 2), and the "post comments?" confirmation
+  (Phase 6). Each defaults to the "include / proceed" choice. Set automatically when
+  invoked from `/oddkit:burndown-ship`.
 
 If the explicit list contains anything that isn't a PR ref, abort with a clear error
 that names the offending token. Don't try to parse flags you don't recognize.
@@ -63,7 +67,7 @@ gh pr list --state open --limit 200 \
 Cache the result as `PR_LIST`. If empty, stop: "No open PRs in this repo."
 
 If count > 30, warn and ask: "Found {N} open PRs. Vet all of them? (y/n)". Anything else
-proceeds without asking.
+proceeds without asking. **Under `--yolo`**, skip the prompt and proceed.
 
 ### Explicit list → fetch each
 
@@ -98,6 +102,9 @@ Include them in this run anyway? (y / n / pick)
 - `y` → include all
 - `n` → drop all from this run
 - `pick` → ask per-PR
+
+**Under `--yolo`:** skip the prompt and include all (equivalent to `y`). The caller
+asked for a fresh pass; honor it.
 
 This is the only realtime gate before spawning agents. Drafts are NOT auto-skipped —
 they're surfaced in the report but still vetted. The dev may want to know.
