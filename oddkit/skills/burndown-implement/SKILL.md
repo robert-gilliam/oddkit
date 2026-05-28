@@ -304,10 +304,11 @@ Print, scoped to issues this run actually touched:
 
 Omit any section that has zero entries — keep the report dense.
 
-**If invoked by burndown-ship:** this `## burndown-implement done` report is your
-internal completion summary only — not the final answer. Return immediately to the
-burndown-ship orchestrator. It has Phases 3–7 (classify, vet, review, feedback,
-summary) still to run. Do not present this report as the end of the session.
+**If invoked by burndown-ship:** when you printed `## burndown-implement done` you are
+still in the same conversation that started burndown-ship. There is no separate
+orchestrator to return to — you ARE burndown-ship, and burndown-ship's Phases 3–7
+(classify, vet, review, feedback, summary) are still ahead of you. Do not say "handing
+off" or "returning to the parent." Your next action is burndown-ship's Phase 3.
 
 ## Resume semantics
 

@@ -39,6 +39,19 @@ done.
 **Shell rule:** never combine `cd` and `git` in a single compound bash command. Use
 separate calls or `git -C <path>`. Applies to you and every subagent.
 
+## You are the orchestrator — there is no other Claude
+
+This skill runs entirely in your current context. The `Skill` tool loads sub-skill
+instructions into THIS conversation — it does not spawn a separate agent or process.
+When burndown-implement's instructions complete, you are still acting as burndown-ship.
+The very next thing you do is Phase 3 of THIS skill.
+
+There is no "handoff." There is no "returning to the orchestrator." Do not write
+phrases like "handing off to burndown-ship orchestrator" or "returning to the parent
+skill" — they describe a process boundary that does not exist. After writing
+burndown-implement's final report, your immediate next action (same response or next
+response, no break) is to start Phase 3.
+
 ## ship.phase state machine
 
 Set on each issue's tracking file as `ship.phase`. `phase` (the burndown-implement
@@ -77,8 +90,9 @@ TaskCreate: "burndown-ship Phase 7 — print summary"
 ```
 
 Mark each task done only when that phase actually completes. **burndown-implement's
-`## burndown-implement done` report is NOT your completion signal — it is a sub-skill
-handoff. You must complete every phase through Phase 7 before this skill is done.**
+`## burndown-implement done` report is NOT your completion signal — it's just a line
+of text you wrote inside the same conversation. You ARE burndown-ship, and you must
+complete every phase through Phase 7 before this skill is done.**
 
 ## Phase 0 — Preflight
 
@@ -152,12 +166,19 @@ Invoke `/oddkit:burndown-implement --yolo` via the Skill tool:
 Skill(skill: "oddkit:burndown-implement", args: "--yolo")
 ```
 
-Wait for it to return. It may take a long time — that's fine, it manages its own
-parallelism. Don't try to monitor it from outside.
+Follow burndown-implement's instructions to completion. It may take a long time —
+that's fine, it manages its own parallelism. The Skill tool just loads its
+instructions into this same conversation; when you finish executing them you continue
+straight into the next section below.
 
-**CRITICAL:** When burndown-implement returns and prints its `## burndown-implement done`
-report, **do not stop**. That report is a sub-skill handoff, not your final answer.
-Mark Phase 2's task done and **immediately proceed to Phase 3** — unless one of the
+**CRITICAL — the mental model trap.** When burndown-implement prints its
+`## burndown-implement done` report, your instinct will be to think "the sub-skill
+finished, now control returns to the orchestrator." That instinct is wrong. There is
+no other orchestrator. You ARE burndown-ship; burndown-implement is a script you were
+following inside the same conversation. The report is just text you wrote. Your next
+tool call should be Phase 3's classification logic — NOT ending the turn.
+
+Mark Phase 2's task done and immediately proceed to Phase 3 — unless one of the
 explicit exit conditions below applies.
 
 If burndown-implement reports zero issues touched:
@@ -167,6 +188,10 @@ If burndown-implement reports zero issues touched:
   Delete `$PENDING_FILE` and jump directly to Phase 4 — don't exit.
 
 Otherwise (at least one issue was touched): proceed to Phase 3 immediately.
+
+Your next action after burndown-implement completes is a Bash call running the
+classification logic in Phase 3. Do not stop, do not summarize, do not say
+"handing off." Just start Phase 3.
 
 ## Phase 3 — Classify newly-created PRs
 
@@ -377,9 +402,12 @@ cases, exit with a clear message and don't try to "make progress" anyway.
 ## Notes for the implementer
 
 - **The most common failure mode is stopping after burndown-implement returns.** The
-  sub-skill prints a `## burndown-implement done` report — this is a handoff, not the
-  final answer. Phases 3–7 (classify, vet, review, feedback, summary) are
-  burndown-ship's own work. You must complete them all before this skill is done.
+  trap is mental, not behavioral: you read the `## burndown-implement done` report and
+  think a sub-skill just returned control to some external orchestrator. That
+  orchestrator does not exist. burndown-implement's instructions ran inside this same
+  conversation — you wrote that report. Phases 3–7 (classify, vet, review, feedback,
+  summary) are still ahead of you, and "you" means the same Claude that just finished
+  Phase 2. Do not end the turn there.
 - **All sub-skill invocations go through the Skill tool**, not through Bash or Agent.
   This keeps the user's experience consistent — slash commands and Skill invocations
   funnel through the same loaders.
