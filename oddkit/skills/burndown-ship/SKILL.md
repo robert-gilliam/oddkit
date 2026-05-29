@@ -19,6 +19,12 @@ End-to-end orchestrator for the burndown loop. Wraps `/oddkit:burndown-implement
 `/oddkit:vet-prs`, `/oddkit:review`, and `/oddkit:address-feedback` into one autonomous
 pipeline. Every sub-skill is invoked with `--yolo`. No human prompts after kickoff.
 
+**Always invoke sub-skills by their full `oddkit:` name** — pass the exact strings
+`oddkit:burndown-implement`, `oddkit:vet-prs`, `oddkit:review`, `oddkit:address-feedback`
+to the `Skill` tool. Other installed skills may share a word like "review," so when you
+reach a phase, don't select by concept ("now I do the review") — copy the namespaced name
+from that phase's invocation block. A bare `review` would silently run a different skill.
+
 **Why one skill.** The four sub-skills already do the work — this one just sequences
 them, scopes vetting to the PRs `burndown-implement` actually created (not pre-existing
 opens), and routes each PR based on its vet verdict. Failure on one PR never blocks
@@ -287,10 +293,11 @@ later without re-reading vet-prs state.
 Build the **review set**: every issue with `ship.phase == "needs_deep_review"`. Skip
 this phase if empty.
 
-Process one PR at a time. The review skill posts to GitHub and writes commits; running
+Process one PR at a time. `oddkit:review` posts to GitHub and writes commits; running
 them in parallel risks rate limits and is hard to recover from on failure.
 
-For each PR in the review set, in order:
+For each PR in the review set, in order, invoke the `oddkit:review` skill by its full
+namespaced name (not a bare `review`, which may resolve to a different skill):
 
 ```
 Skill(skill: "oddkit:review", args: "#<pr_number> --yolo")
