@@ -66,12 +66,35 @@ Always update `updated_at` to current ISO UTC timestamp.
    `package-lock.json` → `npm ci`, `Gemfile.lock` → `bundle install`, etc.) and run
    it from the worktree if `node_modules` / equivalent is missing.
 
-3. **Implement.**
-   - **With a plan**: follow phase by phase like `/oddkit:implement`. Execute phase →
-     run plan-specified verification → commit `Implement phase N: <name>` → tick the
-     progress checkbox in the plan file.
-   - **Without a plan**: implement directly from issue + recon + clarifications. Commit
-     once with a clear message.
+3. **Implement — test-first.** Work in cycles. A cycle is one plan phase (with a plan) or
+   one issue acceptance criterion (without). For each cycle, pick the approach silently
+   from the work itself — never ask:
+   - **Testable logic** (functions, APIs, data, branching) → write a failing test first,
+     then the minimal code to pass it, then refactor with the test green. Type-check the
+     cycle before moving on; type errors are blockers, not warnings.
+   - **Observable but not unit-testable** (UI, config, infra, migrations) → define the
+     observable check first (a script, a query, a render assertion), then implement to it.
+   - **Pure rename/move/typo, no behavior change** → just make it; no test ceremony.
+
+   Make the minimal correct change and fix the root cause, not the symptom. If you hit an
+   adjacent problem outside the issue's scope, note it in CAVEATS rather than fixing it.
+   If a test won't go green after two honest attempts, stop iterating — isolate the cause
+   from first principles before a third try.
+
+   Commit per cycle. Stage explicit paths (`git add <paths>`, never `-A`/`.`) and use a
+   conventional message (`feat:`/`fix:`/`refactor:`/`test:`/`chore:`). With a plan, also
+   tick the phase's progress checkbox in the plan file.
+
+   **Scan every diff before you commit it** for:
+   - race conditions — missing `await`, shared mutable state
+   - off-by-one — loop bounds, slices, pagination
+   - null/undefined handling that silently swallows errors
+   - resource leaks — file handles, connections, listeners, timers
+   - silent failures — empty `catch`, swallowed rejections
+   - stale closures — hooks capturing outdated values
+
+   If one applies and isn't mitigated, fix it in the same cycle or, if out of scope, name
+   it in CAVEATS.
 
 4. **Verify locally — match what CI runs.** Don't push code that CI will reject. Detect
    every verification command the project exposes and run them all:
