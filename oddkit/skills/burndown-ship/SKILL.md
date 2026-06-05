@@ -330,9 +330,19 @@ When it returns:
   `ship.failure_reason = "address-feedback: <one-line reason>"`. Move on.
 
 Detect failure conservatively: the address-feedback skill exits cleanly even when
-nothing actionable was found (zero unresolved comments). That's a success, not a
-failure — there was simply no feedback to address. Only flag failure when the skill
-clearly errored (push rejected, comment-post failed, exception thrown).
+every concern is categorized as Disagree or a false positive (zero code changes to
+push). That's a success — it still posts explanatory replies. Only flag failure when
+the skill clearly errored (push rejected, comment-post failed, exception thrown).
+
+**Post-run sanity check.** After address-feedback returns cleanly, read
+`.oddkit/vet-prs/<pr_number>.json` for this PR. If `concerns` was non-empty and
+the address-feedback output shows no replies posted and no commits pushed, that is
+suspicious — it likely evaluated the concerns incorrectly or read the wrong branch.
+In that case: do NOT write `ship.phase = "shipped"`. Instead write
+`ship.phase = "ship_failed"`, `ship.failure_reason = "address-feedback returned
+cleanly but posted no replies despite non-empty vet concerns — verify manually"`.
+Surface this in the Phase 7 summary so the developer can re-run with manual
+oversight.
 
 ## Phase 7 — Summary
 

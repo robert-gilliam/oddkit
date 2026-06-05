@@ -35,19 +35,40 @@ If `PR_STATE` is not `OPEN`, stop: "PR #<n> is <state>. Reopen it or pick an ope
 
 Verify local branch is up-to-date with origin. If not, stop: "Local branch is not up-to-date with origin. Pull or push first."
 
-## Phase 2 — Set up workspace
+## Phase 1.5 — Check for vet-prs context
 
-If the working tree is clean (`git status --porcelain` is empty) and you're already on `HEAD_BRANCH`, use the current directory. Otherwise create a worktree checked out on `HEAD_BRANCH` — never a new branch off main:
+Before setting up the workspace, check whether a vet-prs verdict exists for this PR:
 
 ```bash
-mkdir -p .oddkit/worktrees
+MAIN_REPO=$(git rev-parse --show-toplevel)
+VET_STATE="$MAIN_REPO/.oddkit/vet-prs/${PR_NUMBER}.json"
+```
+
+If the file exists, read it. The `concerns` array lists specific issues the vet-prs triage flagged. These concerns are **why this PR was routed to address-feedback** — they must be evaluated against the actual code in Phase 4, with the same rigor as a human reviewer's inline comment.
+
+If the file is missing, proceed normally.
+
+## Phase 2 — Set up workspace
+
+Check current branch first:
+
+```bash
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+```
+
+If `CURRENT_BRANCH == HEAD_BRANCH` and `git status --porcelain` is empty, use the current directory as `WORK_DIR`. **Otherwise, always create a worktree** — never skip this step and never evaluate code from the wrong branch:
+
+```bash
+mkdir -p "$MAIN_REPO/.oddkit/worktrees"
 git fetch origin <HEAD_BRANCH>
-git worktree add .oddkit/worktrees/addr-feedback-<timestamp> origin/<HEAD_BRANCH>
+git worktree add "$MAIN_REPO/.oddkit/worktrees/addr-feedback-<timestamp>" origin/<HEAD_BRANCH>
 ```
 
 Fetch the base branch for comparison.
 
-Store `WORK_DIR` for all subsequent file operations.
+Store `WORK_DIR` (the worktree path, or current directory if already on the right branch) for all subsequent file operations.
+
+**Critical:** All file reads in Phase 4 must use `WORK_DIR`. Do NOT use `mcp__plugin_github_github__get_file_contents` with a `branch` parameter to read files — this tool has a known defect where it silently returns the default-branch content instead of the specified branch, making your evaluation wrong. Read from the local worktree path instead.
 
 ## Phase 3 — Fetch all comments
 
@@ -64,9 +85,14 @@ gh api repos/{owner}/{repo}/pulls/{PR_NUMBER}/reviews --paginate
 gh api repos/{owner}/{repo}/issues/{PR_NUMBER}/comments --paginate
 ```
 
-Merge all three into a single list. Filter to actionable, unresolved comments. For each, store: `comment_id`, `comment_type` (inline, review, conversation), `path` (if inline), `line` (if inline), `body`, `diff_hunk` (if inline), `user.login`.
+Merge all three into a single list. For each, store: `comment_id`, `comment_type` (inline, review, conversation), `path` (if inline), `line` (if inline), `body`, `diff_hunk` (if inline), `user.login`.
 
 Group inline comments by file. Conversation and review-body comments form a separate "general" group.
+
+**Do not filter out comments based on author being a bot, CI system, or automation.**
+Comments posted by `oddkit:vet-prs` (marked with `<!-- oddkit:vet-prs -->`) are especially important — the concerns listed there are the primary issues this PR was routed to address. Excluding them because they came from automation is the wrong call: the concerns still need to be evaluated against the actual code. If the vet-prs state file from Phase 1.5 listed non-empty `concerns`, each one appears in that comment and must be evaluated in Phase 4.
+
+Similarly, if you already read vet-prs concerns from Phase 1.5, cross-reference them with what you find in the comment thread — they should match. Use the local state file's structured data as a checklist alongside the comment body.
 
 ## Phase 4 — Evaluate each comment
 
@@ -74,13 +100,17 @@ For each comment:
 
 ### 4a. Read the actual code
 
-Read the file at the comment's path. At least 30 lines of context. Trace related code paths if needed.
+Read the file at the comment's path **from `WORK_DIR`** (the local worktree). At least 30 lines of context. Trace related code paths if needed.
+
+Never read code via `mcp__plugin_github_github__get_file_contents` with a `branch` parameter here — that tool silently returns default-branch content, not the PR branch. Use `Read` tool on the absolute path inside `WORK_DIR`.
 
 ### 4b. Evaluate critically
 
 - Is the comment valid? Does the issue exist?
 - Is the reviewer's understanding correct? If the code is right, explain why.
 - Is there a real problem, but different from what the reviewer described? Fix the real one.
+
+**For vet-prs concerns specifically:** the vet agent only read the diff, not the full file. Its concern may be a false positive — the real code in context makes something clear that wasn't visible in the diff. Read the actual file and decide. A "false positive" is a valid and complete outcome — it still needs an explanatory reply. Do not silently skip a concern just because you suspect it's a false positive; confirm it against the code, then explain why.
 
 ### 4c. Categorize
 
@@ -104,6 +134,12 @@ Fix-with-care.
 For "Unclear" comments (you can't tell what the reviewer wants): re-read the code with
 fresh eyes, pick the most reasonable interpretation, and proceed. Note the assumption
 in the reply so the reviewer can correct it if you guessed wrong.
+
+**Zero-fix does not mean zero-reply.** If every comment evaluates to Disagree (code is
+correct, concern is a false positive), the phase still produces reply drafts explaining
+why. Posting those replies is the deliverable. Do not exit Phase 6 with a "nothing
+actionable found" without having posted at least one reply per concern — silence is not
+an acknowledgment.
 
 **Non-`--yolo` mode:** present Fix-with-care, Defer, and Unclear items in the Phase 6
 summary so the developer can redirect before push. Don't pause mid-categorize — gather
