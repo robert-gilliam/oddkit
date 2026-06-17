@@ -27,6 +27,9 @@ separate calls or `git -C <path>`.
 - Recon: `[<main-repo>/.oddkit/burndown-issue-tracking/<n>-recon.md]`
 - Tracking file (you write progress here): `[<main-repo>/.oddkit/burndown-issue-tracking/<n>.json]`
 - Clarifications: `[<main-repo>/.oddkit/burndown-clarifying-questions/<n>.md]` or `null`
+- Images: `[absolute paths from tracking JSON images array]` or `none` — screenshots
+  from the issue. If present, Read them before implementing; they show the visual or bug
+  state the change targets.
 - Plan: `[<main-repo>/.oddkit/burndown-plans/<n>.plan.md]` or `null` (simple issues — implement from issue + recon + clarifications)
 - Base branch: `[main | <predecessor branch>]`
 - Per-issue worktree to create: `[<main-repo>/.oddkit/worktrees/burndown-issue-<n>]`

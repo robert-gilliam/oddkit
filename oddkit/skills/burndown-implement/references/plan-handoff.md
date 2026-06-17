@@ -26,6 +26,11 @@ clarifications were needed). Treat each `[Answer]:` line as authoritative. If an
 is `agent's call`, choose the most reasonable option and note the decision in the plan's
 "Key Decisions" section.
 
+## Images
+`[absolute paths from tracking JSON images array]` or `none`. If present, Read these
+screenshots — they show the visual or bug state and often clarify scope. Factor them into
+the plan.
+
 ## Output path
 Write the plan to `[<main-repo>/.oddkit/burndown-plans/<n>.plan.md]`.
 

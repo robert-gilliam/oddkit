@@ -83,7 +83,7 @@ git -C "$MAIN_REPO" rev-parse --verify "origin/$BASE_BRANCH" >/dev/null 2>&1 \
 
 Initialize state directories in the **main repo's** `.oddkit/` (gitignored, branch-independent):
 ```bash
-mkdir -p "$MAIN_REPO"/.oddkit/{burndown-issue-tracking,burndown-issue-descriptions,burndown-clarifying-questions,burndown-archive-clarifying-questions,burndown-plans,burndown-comments-pending,worktrees}
+mkdir -p "$MAIN_REPO"/.oddkit/{burndown-issue-tracking,burndown-issue-descriptions,burndown-issue-images,burndown-clarifying-questions,burndown-archive-clarifying-questions,burndown-plans,burndown-comments-pending,worktrees}
 ```
 
 State files always live in `$MAIN_REPO/.oddkit/` — never inside any worktree. The recon
@@ -145,6 +145,41 @@ state), then the body, then a `## Comments` section if non-empty. This is the ca
 copy of the issue — burndown-implement reads from here, not from `gh` (no network at
 implement time).
 
+### Embedded images
+
+Screenshots in an issue carry real signal — someone added them for a reason. Download
+them now so recon, classification, and question authoring can all see them.
+
+Scan the body **and comments** for image references in all three forms:
+- HTML tags: `<img ... src="<url>" ...>` (GitHub's default paste format — easy to miss)
+- Markdown: `![alt](<url>)`
+- Bare attachment URLs: `https://github.com/user-attachments/assets/...` and
+  `https://user-images.githubusercontent.com/...`
+
+For each reference, download to
+`$MAIN_REPO/.oddkit/burndown-issue-images/<n>/<NN>-<slug>.<ext>` (`<NN>` is a 2-digit
+index in document order). Attachment URLs are auth-gated — a plain fetch 404s, so pass a
+token:
+```bash
+mkdir -p "$MAIN_REPO/.oddkit/burndown-issue-images/<n>"
+curl -sL -H "Authorization: token $(gh auth token)" -o "<dest>" "<url>"
+```
+
+Verify each download is actually an image (`file "<dest>"` reports an image type, or the
+HTTP content-type was `image/*`). Keep only images:
+- **Non-image attachment** (PDF, etc.) → don't store as an image; it still gets listed
+  under Linked files in Phase 6 so the developer sees it.
+- **Download failure** (auth, 404, network) → skip that one, remember the URL for a
+  Phase 6 note (`⚠ couldn't fetch — view on GitHub`), and keep going. Never let an image
+  fetch block planning an issue.
+
+Cap at **6 images per issue**. If an issue references more, take the first 6 in document
+order and `log()` how many were dropped — no silent truncation.
+
+Hold each issue's downloaded-image list (path, source URL, alt text, `body`/`comment`)
+for Phase 3, which writes it into the tracking file's `images` field. These images are
+**not** deleted in Phase 7 — they persist under `.oddkit/` for implement to reuse.
+
 ### Open PRs (one fetch per batch)
 
 Open PRs are shared context for every issue — fetch them once here, not per recon agent.
@@ -203,6 +238,7 @@ implement can branch off the right base:
   "rationale": null,
   "blocked_by": [],
   "clarifications_file": null,
+  "images": [],
   "evidence": [],
   "recon_summary": null,
   "worktree": null,
@@ -241,12 +277,43 @@ from `phase` and the explicit result fields (`pr_url`, `clarifications_file`,
 Write the file immediately and rewrite it after every state change. Use a small atomic
 write (`mv tmp final`) to avoid half-written JSON on crash.
 
+Populate `images` from the Phase 2 downloads for this issue (empty array if none). Each
+entry records where the image came from so implement can reuse it later:
+```json
+"images": [
+  {
+    "path": ".oddkit/burndown-issue-images/456/01-broken-promo.png",
+    "source_url": "https://github.com/user-attachments/assets/7189...",
+    "alt": "Image",
+    "from": "body"
+  }
+]
+```
+`path` is relative to `$MAIN_REPO`, matching `clarifications_file`'s convention.
+
 ## Phase 4 — Recon all issues in parallel
 
 For each issue, spawn `@oddkit:code-scout` and `@oddkit:impact-scout` via the Agent tool —
 **`model: sonnet` on every call**. Pass the issue title and body. Tell each agent to:
 - Read code from `$RECON_WORKTREE` (pass it as `cwd`) so they see fresh `origin/<base>`.
 - Write any output files to absolute paths under `$MAIN_REPO/.oddkit/`.
+
+### Embedded images for every recon prompt
+
+If the issue's tracking JSON has a non-empty `images` array, append this block (absolute
+paths, one per image). Omit it entirely when there are none:
+
+```
+## Screenshots from the issue
+
+Read these before reconning — they show the visual or bug state and inform where the
+work lands:
+- <abs path to 01-...png>
+- <abs path to 02-...png>
+
+In your output, include a one-line "Visual note" describing what the screenshots show
+that's relevant to the implementation.
+```
 
 ### Open-PR context for every recon prompt
 
@@ -284,7 +351,9 @@ work lands, what pattern to follow. Save full recon output as
 
 ### Classify (you, inline)
 
-For each issue, decide from issue text + recon:
+For each issue, decide from issue text + recon. If the issue has downloaded images, Read
+them first — someone added those screenshots for a reason, and they often disambiguate
+scope (which screen, which state, how much is broken). Factor them into the call.
 
 - **already_done**: behavior already exists. No PR, no questions. Record `evidence`:
   1-3 file:line refs from recon. Be conservative — partial coverage stays `simple` or
@@ -374,14 +443,21 @@ ALWAYS use this exact structure. Implement parses it.
 
 For the **Issue summary** section, read the cached body at
 `$MAIN_REPO/.oddkit/burndown-issue-descriptions/<n>.md` and write a 1-3 sentence plain-
-language summary. For **Linked files**, scan the body (and comments, if any) for:
-- Image/file attachments (`https://github.com/user-attachments/...`,
-  `https://user-images.githubusercontent.com/...`)
+language summary. Before writing it, Read the issue's downloaded images (from tracking's
+`images` array) so the summary reflects what the screenshots actually show — not just the
+text around them.
+
+For **Linked files**, scan the body (and comments, if any) for:
+- HTML image tags (`<img src="url">`) and image/file attachments
+  (`https://github.com/user-attachments/...`, `https://user-images.githubusercontent.com/...`)
 - Markdown image refs (`![alt](url)`)
 - Markdown links to docs, specs, screenshots, gists, or any external URL
 - Bare URLs to the same
 
-List each as `- <url> — <short label>`. If none, write `None.`.
+List each as `- <url> — <short label>`. For images that were downloaded, append the local
+path so the dev can open it: `- <url> — screenshot of broken state (local: <path>)`. For
+any image that failed to download, note it: `- <url> — ⚠ couldn't fetch, view on GitHub`.
+If none, write `None.`.
 
 ```markdown
 ---
@@ -549,6 +625,10 @@ rm -f "$MAIN_REPO/.oddkit/burndown-open-prs.json"
 The recon outputs (`<n>-recon.md`) are saved under `.oddkit/`. The recon worktree and
 open-PR cache have no further purpose — every per-issue suggestion is durable in
 tracking JSON's `pr_suggestion` and in the clarifications file.
+
+**Don't delete `burndown-issue-images/`.** Downloaded screenshots persist under
+`.oddkit/` and are referenced by tracking JSON's `images` array so implement can reuse
+them. They're cleaned up with the rest of `.oddkit/` state when the developer is done.
 
 Stop. Don't start implementation.
 
