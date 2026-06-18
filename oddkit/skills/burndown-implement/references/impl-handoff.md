@@ -41,6 +41,14 @@ Update the tracking file (`<n>.json`) at every checkpoint. Use atomic writes (wr
 `<n>.json.tmp`, then `mv`). The orchestrator can be re-spawned if interrupted, so the
 file must always be consistent.
 
+**Read-modify-write — never reconstruct.** Every write must read the existing JSON,
+mutate only the fields named for that checkpoint, and write the whole object back.
+Never build the file from scratch with just the fields you know about — doing so silently
+drops fields the orchestrator owns and depends on later (e.g. `clarifications_file`,
+which the archive step in Phase 4 reads to move the answered questions out of the active
+directory; if you drop it, the archive no-ops and the file is stranded). Preserve every
+key you didn't explicitly change, including ones not documented here.
+
 `phase` is the canonical state field. Don't write parallel boolean flags
 (`implementation_complete`, `pushed_to_github`, etc.) — derive from `phase` and the
 explicit result fields.

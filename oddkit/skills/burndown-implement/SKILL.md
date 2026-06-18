@@ -229,11 +229,14 @@ mv -f "$MAIN_REPO/<clarifications_file>" \
       "$MAIN_REPO/.oddkit/burndown-archive-clarifying-questions/<n>.md"
 ```
 
-(`<clarifications_file>` from tracking; skip when it's `null`.) This keeps
-`.oddkit/burndown-clarifying-questions/` showing only outstanding work — answered files
-for shipped issues move to the archive. For `failed` and `blocked`, **leave the
-clarifications file in place** so a retry has the answers ready. `already_done` issues
-have no clarifications file.
+(`<clarifications_file>` from tracking.) When it's `null`, don't assume there was no
+clarifications file — the impl agent may have dropped the field on a state write. Fall
+back to the conventional path `.oddkit/burndown-clarifying-questions/<n>.md` and archive
+it if it exists; only treat the issue as having no clarifications file when that path is
+also absent. This keeps `.oddkit/burndown-clarifying-questions/` showing only outstanding
+work — answered files for shipped issues move to the archive. For `failed` and `blocked`,
+**leave the clarifications file in place** so a retry has the answers ready.
+`already_done` issues have no clarifications file.
 
 If a file with the same name already exists in the archive (rare — only happens after a
 re-plan + re-ship cycle on the same issue), `mv -f` overwrites it. The most recent
