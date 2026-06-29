@@ -1,19 +1,24 @@
 ---
 name: review-and-fix
 description: >
-  Autonomous review + fix loop. Runs the review agents, fixes everything they find, posts inline
-  comments on each fixed (or deferred) location, and opens follow-up GitHub issues for any work
-  that's too sprawling to fix in-place. No confirmation prompts, no permission asks — finish the job.
-  Use when the user wants to review and fix a PR or branch in one shot, ship review fixes
-  hands-off, "review and fix it", "fix everything the review finds", or says /oddkit:review-and-fix.
-argument-hint: "[#PR or branch] [--dry-run]"
+  Autonomous review + fix loop that finishes the work. Runs the review agents, checks the PR
+  against its source issue's requirements, fixes everything found, loops until clean, and leaves a
+  clean trail on the PR. Defaults to finishing every fix in-place — never punts sprawling work to a
+  follow-up issue. No confirmation prompts, no permission asks. Use when the user wants to review
+  and fix a PR or branch in one shot, fully implement an issue, ship review fixes hands-off,
+  "review and fix it", "fix everything the review finds", or says /oddkit:review-and-fix.
+argument-hint: "[#PR or branch] [--dry-run] [--allow-defer]"
 ---
 
 # Review and Fix
 
-End-to-end loop: find issues with the review agents, fix them in code, leave a clean trail on the PR. Runs autonomously — no confirmation prompts, no "should I push?" asks. If a finding is too sprawling to fix safely, defer it to a follow-up GitHub issue instead of asking the user.
+End-to-end loop: find issues with the review agents, confirm the PR actually implements its source issue, fix everything in code, loop until clean, and leave a clean trail on the PR. Runs autonomously — no confirmation prompts, no "should I push?" asks.
 
-The skill is essentially `/oddkit:review` and `/oddkit:address-feedback` collapsed into one pass — but it skips posting findings to GitHub just to read them back. Findings flow directly from reviewer to fixer in memory.
+**The default is to finish the job.** Every real finding gets fixed in-place — sprawling fixes included — and every requirement in the source issue gets implemented. Work is never punted to a follow-up issue just because it's large. The one exception is a genuine last resort: a specific piece that truly can't land autonomously — needs a credential or external system you don't have, a human design decision, or a fix that keeps breaking after real attempts. That one piece gets a follow-up issue, gets reported loudly, and downgrades the verdict; everything else still ships.
+
+`--allow-defer` restores the conservative behavior: sprawling-and-important findings go to follow-up issues instead of being fixed in-place.
+
+Findings flow directly from reviewer to fixer in memory — the skill never posts findings to GitHub just to read them back.
 
 ## Parse arguments
 
@@ -22,6 +27,7 @@ Extract from `$ARGUMENTS`:
 - **No PR reference, current branch has open PR** → **PR mode** on the current branch
 - **No PR reference, no open PR** → **local mode** (review + fix HEAD vs main, no GitHub)
 - **`--dry-run`**: do everything except commit/push/post — print what would happen
+- **`--allow-defer`**: conservative mode. Defer sprawling-and-important findings to follow-up issues instead of fixing them in-place (the pre-completion behavior). Off by default — by default the skill finishes the work.
 
 ## Phase 1 — Resolve target
 
@@ -59,6 +65,21 @@ git diff main...HEAD --stat
 Store as `LOCAL_DIFF` and `DIFF_STAT`. If empty, stop: "No changes found. Nothing to review."
 
 If diff exceeds 5,000 lines, warn once and continue (autonomous — don't block on confirmation).
+
+### Source issue — the spec of "done"
+
+The PR exists to satisfy something. Find what:
+
+- **PR mode**: parse `PR_BODY` for `Closes #N` / `Fixes #N` / `Resolves #N`, and check `.oddkit/burndown-issue-tracking/` if present. For each linked issue:
+
+  ```bash
+  gh issue view <N> --json number,title,body
+  ```
+
+  Store the combined requirements (acceptance criteria, checklists, "must" statements) as `ISSUE_SPEC`. If the PR links no issue, fall back to `PR_BODY` as the spec.
+- **Local mode**: no issue or PR. Derive a loose spec from recent commit messages / branch intent, or skip the completeness check if there's nothing meaningful to compare against.
+
+`ISSUE_SPEC` is the authoritative list of what the change must accomplish. In default mode the skill checks the code against it and implements anything missing — an unimplemented requirement is a finding, not optional polish. Under `--allow-defer`, an unimplemented requirement can be deferred like any other finding.
 
 ## Phase 2 — Set up worktree
 
@@ -103,14 +124,14 @@ All three agents get:
 - For PR mode, also: file list `PR_FILES` with "Only report findings in these files."
 
 **correctness**: no PR description — mechanical review of what breaks.
-**intent-checker**: gets `PR_BODY` (PR mode only). Skip this agent in local mode (no stated intent to check against).
+**intent-checker**: gets `PR_BODY` and `ISSUE_SPEC`. Frame it: "Compare the code against the requirements in the source issue (`ISSUE_SPEC`) and the PR description. Flag every requirement that is not fully implemented as a finding — these are gaps to fix, not optional polish." Skip this agent in local mode unless a spec was derived.
 **design-critic**: gets `PR_BODY` if available. Search for existing patterns that could simplify.
 
 Each agent must quote exact code snippets for every finding.
 
 ### Plan review → 3 agents in parallel
 
-If the diff is markdown/docs only, spawn `@oddkit:fact-checker`, `@oddkit:completeness-auditor`, `@oddkit:design-critic` with the same diff/scope inputs. Plan review still benefits from fixing — typos, factually wrong references, missing sections.
+If the diff is markdown/docs only, spawn `@oddkit:fact-checker`, `@oddkit:completeness-auditor`, `@oddkit:design-critic` with the same diff/scope inputs. Pass `ISSUE_SPEC` to completeness-auditor so it flags requirements the plan doesn't cover. Plan review still benefits from fixing — typos, factually wrong references, missing sections.
 
 ## Phase 4 — Verify findings
 
@@ -121,53 +142,68 @@ Same verification as `/oddkit:review`:
 3. For every finding, read the file in `WORK_DIR`, search for the quoted snippet, check ~20 lines of context, trace callers/types as needed.
 4. **Discard** if: snippet doesn't exist, issue doesn't exist in actual code, issue is handled elsewhere, concern is theoretical.
 
+**Completeness findings (a missing `ISSUE_SPEC` requirement)** are the exception to the snippet rule — there's no snippet because the code doesn't exist yet. Verify these by confirming the requirement genuinely isn't implemented anywhere in `WORK_DIR` (grep for related functions, routes, config, tests). If it's actually implemented elsewhere, discard. If genuinely absent, keep it as a Fix.
+
 Keep the count of discarded findings as `DISCARDED`.
 
 ## Phase 5 — Classify each surviving finding
 
-For each finding, decide one of:
+For each finding (including unmet `ISSUE_SPEC` requirements), decide:
 
 | Class | Criteria | Action |
 |-------|----------|--------|
 | **Fix** | Real issue, fix fits in the affected file or 1-2 adjacent files, doesn't change public interfaces or behavior contracts | Implement the fix |
-| **Fix-with-care** | Real issue, fix touches more files or has nuance, but still tractable in one session | Implement the fix, note carefully in commit message |
-| **Defer** | Issue is **both** important enough to track and so sprawling it can't land in this PR — would require restructuring, schema changes, breaking API changes, or multi-system coordination, AND leaving it unaddressed would meaningfully hurt correctness, security, performance, or maintainability | Create follow-up GitHub issue (mandatory), leave acknowledged comment |
-| **Drop** | Real issue but minor enough that no one would prioritize the follow-up — nits, style preferences, micro-optimizations, "would be nicer if", or anything that's a judgment call rather than a clear correctness/quality problem | Don't fix, don't track, don't comment. Mention briefly in the terminal summary so the trail isn't silent. |
+| **Fix-with-care** | Real issue, fix touches more files or has nuance, but still tractable in this session | Implement the fix, note carefully in commit message |
+| **Drop** | Real issue but minor enough that no one would prioritize a follow-up — nits, style preferences, micro-optimizations, "would be nicer if", judgment calls rather than clear correctness/quality problems | Don't fix, don't track, don't comment. Mention briefly in the terminal summary. |
+| **Defer** | *(only under `--allow-defer`)* Issue is **both** important enough to track **and** so sprawling it can't land in this PR — restructuring, schema changes, breaking API changes, or multi-system coordination | Create follow-up GitHub issue (mandatory), leave acknowledged comment |
 
-**Bias toward fixing.** The default is to do the work, not duck it. Touching multiple files is not by itself a reason to defer — that's just Fix-with-care.
+**Default mode: there is no Defer.** Every real finding is Fix or Fix-with-care; minor ones are Drop. Sprawling is not a reason to defer — a fix that touches many files or restructures a subsystem is still Fix-with-care, just done with more care and more verification. The job is to finish the work, `ISSUE_SPEC` requirements included. The only escape from finishing is the genuine last resort handled in Phase 6 — not a class you reach for up front.
 
-**Defer is the rarest outcome.** Two conditions, both required:
-- **Sprawling fix** — restructuring, schema changes, breaking API changes, or multi-system coordination. Not "this would touch 5 files" — that's Fix-with-care. Genuinely "I'd be redesigning a subsystem."
-- **Important enough to follow up** — if no one would actually pick up the follow-up issue, the finding doesn't deserve a follow-up issue. Drop it instead.
+**`--allow-defer` mode** adds the Defer class back. Both conditions are required: sprawling AND important enough that someone would actually pick up the follow-up. If only sprawling, Drop. If only important, do the work. When in doubt between Fix-with-care and Defer, pick Fix-with-care; between Defer and Drop, pick Drop — a follow-up no one prioritizes is just noise, and the reviewer agents are not infallible.
 
-If only the first condition is met (sprawling but not important), Drop. If only the second is met (important but tractable), do the work — Fix or Fix-with-care.
-
-When in doubt between Fix-with-care and Defer, pick Fix-with-care. When in doubt between Defer and Drop, pick Drop — a follow-up issue that no one prioritizes is just noise, and the reviewer agents are not infallible.
-
-## Phase 6 — Implement fixes
+## Phase 6 — Implement fixes, loop until clean
 
 For each Fix and Fix-with-care finding, in `WORK_DIR`:
 
 1. Make the change.
 2. Verify the surrounding code still makes sense.
 3. Stage the change.
-4. Commit with message: `Address review: <one-line description>` (use HEREDOC for multi-line if needed, ending with Claude co-author trailer per repo convention).
+4. Commit with message: `Address review: <one-line description>` (use HEREDOC for multi-line if needed, ending with the Claude co-author trailer per repo convention).
 
 Group commits when multiple findings share a root cause (e.g., the same null-safety pattern fixed in three places → one commit).
 
-If a fix breaks tests or produces something obviously wrong on second look, try the next most reasonable approach before giving up — re-read the failing test, re-read the surrounding code, consider whether the original finding was a true positive. Reclassifying as Defer is a last resort, not the first response to friction. If after a genuine second attempt the fix still doesn't work cleanly, then reclassify — to **Drop** if the finding is minor, or to **Defer** only if both Defer conditions in Phase 5 are met.
+### When a fix fights back
+
+If a fix breaks tests or produces something obviously wrong on second look, try the next most reasonable approach before giving up — re-read the failing test, re-read the surrounding code, reconsider whether the original finding was a true positive. Friction is not a reason to stop.
+
+- **`--allow-defer` mode**: if after a genuine second attempt it still won't land cleanly, reclassify — **Drop** if minor, **Defer** if both Phase 5 Defer conditions hold.
+- **Default mode**: there is no routine defer. Drop it only if it turns out minor. The **last-resort follow-up** below is reserved for the rare piece that genuinely cannot be completed autonomously — not for fixes that are merely hard or large.
+
+### Last-resort follow-up (default mode)
+
+A piece qualifies as last-resort *only* when finishing it autonomously is impossible, not just big: it needs a credential or external system you don't have, a human design decision you can't make, or a fix that keeps breaking after real attempts. When that happens, create a single follow-up issue for **just that piece** (Phase 7), finish everything else, report it loudly, and downgrade the verdict. Do not route sprawling-but-doable work here — that's the exact trap this skill exists to avoid. One or two last-resort follow-ups across a run is plausible; more than that means you're punting work that should have been fixed — go back and fix it.
+
+### Re-review loop
+
+Big fixes can introduce new problems, and a completeness fix can leave loose ends. After a round of fixes, re-run a lightweight check on the **new** diff (current `WORK_DIR` vs base): re-run the review agents on the changed hunks and re-check unmet `ISSUE_SPEC` requirements. Feed any new actionable findings back through Phases 4–6.
+
+Stop when a pass surfaces nothing actionable **and** every `ISSUE_SPEC` requirement is implemented (or sent to a last-resort follow-up). Cap at 3 rounds — if you're still finding substantive issues after three, the change needs human eyes: finish what you can, downgrade the verdict, and say so in the summary.
+
+### Verify before claiming done
+
+Before finishing, run the project's build/test command in `WORK_DIR` if one exists (check `package.json`, `Makefile`, `pyproject.toml`, repo conventions). "All requirements met" must be backed by green tests, not asserted. If tests fail and you can't fix them in-loop, report it — don't claim completion.
 
 After all fixes are committed, record each fix's commit SHA and the file/line where the fix landed in the post-fix code. You'll need these for the PR comments.
 
-## Phase 7 — Create follow-up issues for deferred work
+## Phase 7 — Create follow-up issues
 
-This applies only to **Defer** findings — not Drop. Dropped findings get a brief
-mention in the terminal summary and nothing more (no issue, no PR comment, no
-tracking).
+Two things land here:
+- **`--allow-defer` mode**: every **Defer** finding (mandatory — don't skip, don't ask).
+- **Default mode**: only the rare **last-resort** piece from Phase 6 that genuinely couldn't be completed. If you have more than one or two, you're punting work that should have been fixed — go back to Phase 6.
 
-**For each Defer finding, this phase is mandatory.** Don't skip it. Don't ask the user. Just create the issue. If you find yourself with many "defers," that's a signal you're under-fixing — revisit the classification before creating issues for them.
+Neither applies to **Drop** (brief terminal mention only) or to normal fixed findings.
 
-For each Defer finding, in PR mode:
+For each such finding, in PR mode:
 
 ```bash
 gh issue create \
@@ -179,7 +215,7 @@ Surfaced during /oddkit:review-and-fix on PR #<PR_NUMBER>.
 
 {Issue description}
 
-**Why deferred:** {explanation — typically: too sprawling for in-PR fix, would require restructuring, would break unrelated callers, etc.}
+**Why not done in this PR:** {explanation — for `--allow-defer`: too sprawling for an in-PR fix, would break unrelated callers, etc. For a last-resort follow-up: what made it impossible to finish autonomously — missing credential/system, needs a human decision, fix kept breaking.}
 
 **Where in code:** `{file}:{line}` (as of <HEAD_SHA>)
 
@@ -190,9 +226,9 @@ EOF
 )"
 ```
 
-Store the new issue numbers as `FOLLOWUP_ISSUES` (a list of `{finding_id, issue_number, issue_url}`).
+Store the new issue numbers as `FOLLOWUP_ISSUES` (a list of `{finding_id, issue_number, issue_url, reason}` where `reason` is `deferred` or `last-resort`).
 
-In local mode, there's no PR/repo context for follow-up issues. Instead, write deferred findings to `.oddkit/review-and-fix-<timestamp>-deferred.md` in the repo root with the same content shape, and note the file path in the terminal output. Don't try to create issues against an arbitrary repo without confirmation.
+In local mode, there's no PR/repo context for follow-up issues. Instead, write these findings to `.oddkit/review-and-fix-<timestamp>-deferred.md` in the repo root with the same content shape, and note the file path in the terminal output. Don't create issues against an arbitrary repo without confirmation.
 
 ## Phase 8 — Push (PR mode only)
 
@@ -218,9 +254,9 @@ After push, get the new `HEAD_SHA` from `gh pr view` again — inline comments m
 
 Pick a verdict for the summary review:
 
-- All findings fixed (or dropped), no defers → `Ready to merge`
-- Some fixes landed, no blocking defers outstanding → `Fix then merge` (here "fix" usually means human eyes on the diff)
-- Deferred findings include something that blocks merging → `Needs reworking`
+- Everything fixed (or dropped), all `ISSUE_SPEC` requirements implemented, tests pass, no follow-ups → `Ready to merge`
+- Fixes landed and tests pass, but human eyes on the diff are warranted → `Fix then merge`
+- A last-resort follow-up or unmet requirement blocks the issue, tests don't pass, or the loop hit its cap with issues outstanding → `Needs reworking`
 
 Drop'd findings don't affect the verdict — they were judged not worth tracking.
 
@@ -252,14 +288,14 @@ For each **fixed** finding, call `mcp__plugin_github_github__add_comment_to_pend
 Commit: {short_sha}
 ```
 
-For each **deferred** finding, anchor on the original file/line and post:
+For each finding sent to a **follow-up issue** (Defer under `--allow-defer`, or a last-resort piece), anchor on the original file/line and post:
 
 ```
-**Acknowledged, deferred** — [{Agent}]
+**Tracked in follow-up** — [{Agent}]
 
 {Issue, one sentence.}
 
-**Why deferred:** {one-sentence reason}.
+**Why not done here:** {one-sentence reason — deferred as out of scope, or couldn't be finished autonomously}.
 
 Follow-up: #{issue_number}
 ```
@@ -281,8 +317,8 @@ Call `mcp__plugin_github_github__pull_request_review_write` with:
 
 **Recommendation:** {VERDICT}.
 
-Reviewed: {N} issue(s) — {FIXED_COUNT} fixed, {DEFERRED_COUNT} deferred to follow-up, {DROPPED_COUNT} minor items judged not worth tracking.
-{Discarded count} finding(s) removed during verification.
+Reviewed: {N} issue(s) — {FIXED_COUNT} fixed, {FOLLOWUP_COUNT} tracked in follow-up, {DROPPED_COUNT} minor items judged not worth tracking.
+{Discarded count} finding(s) removed during verification. Tests: {pass/fail/n-a}.
 
 {If FOLLOWUP_ISSUES is non-empty:}
 Follow-ups: {comma-separated #issue refs}
@@ -301,13 +337,13 @@ Print a terminal summary:
 
 {DIFF_STAT}
 
-**Verdict:** {VERDICT}
+**Verdict:** {VERDICT}   |   Tests: {pass/fail/n-a}
 
 ### Fixed ({N})
 - {file}:{line} — {one-line description} ({commit_sha})
 
-### Deferred ({N})
-- {file}:{line} — {one-line description} → #{issue_number} ({issue_url})
+### Tracked in follow-up ({N})
+- {file}:{line} — {one-line description} → #{issue_number} ({issue_url}) — {deferred | last-resort}
 
 ### Dropped ({N})
 - {file}:{line} — {one-line description}. {Why dropped: minor / nit / judgment call.}
@@ -316,6 +352,8 @@ Print a terminal summary:
 
 {PR link if PR mode}
 ```
+
+If any `ISSUE_SPEC` requirement went to a last-resort follow-up or remains unmet, call it out explicitly at the top of the summary — this is the work that didn't ship, and it must not be buried.
 
 Remove the worktree:
 
@@ -327,15 +365,17 @@ In `--dry-run`, also note: "Dry run — no commits, pushes, comments, or issues 
 
 ## Failure handling
 
-- **Agent finds nothing**: nothing to fix. Post a summary review (PR mode) with "Reviewed: 0 issues found." and `APPROVE` / `Ready to merge`. Skip phases 5-7.
+- **Agent finds nothing and all `ISSUE_SPEC` requirements are met**: nothing to fix. Post a summary review (PR mode) with "Reviewed: 0 issues found." and `APPROVE` / `Ready to merge`. Skip phases 5-7.
 - **All findings discarded during verification**: same as above — report the discards in the summary so it's clear the reviewers ran.
-- **Fix attempt produces broken code**: reclassify that finding as Defer, roll back the working-copy change (don't commit it), and continue with the rest.
+- **Fix attempt produces broken code**: roll back the working-copy change (don't commit it) and retry per Phase 6. Only if it still won't land: Drop (if minor) or — default mode — a last-resort follow-up; `--allow-defer` mode — Defer. Continue with the rest either way.
+- **Tests fail and can't be fixed in-loop**: do not claim completion. Report the failure in the summary and set the verdict to `Needs reworking`.
 - **Push fails** (e.g., remote moved): leave commits in `WORK_DIR`, report the failure with the worktree path, do not remove the worktree.
-- **Issue creation fails for a deferred finding**: do not silently drop it. Report the failure clearly in the terminal summary and exit non-zero in spirit (the trail is incomplete).
+- **Issue creation fails for a follow-up finding**: do not silently drop it. Report the failure clearly in the terminal summary and exit non-zero in spirit (the trail is incomplete).
 
 ## What this skill does NOT do
 
 - Does **not** prompt for confirmation. Autonomous means autonomous.
+- Does **not** punt sprawling-but-doable work to a follow-up issue (unless `--allow-defer`). Large fixes get done.
 - Does **not** read or reply to existing human review comments — that's `/oddkit:address-feedback`. This skill operates on the review *it just generated*.
 - Does **not** rebase, squash, or rewrite history.
 - Does **not** force-push. If a normal push is rejected, surface the error.
