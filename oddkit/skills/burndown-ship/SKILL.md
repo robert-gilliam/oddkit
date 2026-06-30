@@ -118,6 +118,24 @@ gh repo view --json owner,name >/dev/null \
   || { echo "Not in a GitHub repo (or gh not authenticated). Aborting."; exit 1; }
 ```
 
+### Reconcile stale cleanup
+
+burndown-implement archives clarifications and removes the worktree right after writing
+`phase: "done"`. That trailing step can be skipped if a run is interrupted at the
+implement→ship seam, leaving a done issue's answered clarifications stranded in the active
+dir and its worktree on disk. Re-assert it here — idempotent, runs every ship, so any
+straggler self-heals on the next invocation. Same two operations implement already does:
+
+```bash
+mkdir -p "$MAIN_REPO/.oddkit/burndown-archive-clarifying-questions"
+for f in $(grep -lE '"phase"[[:space:]]*:[[:space:]]*"done"' "$TRACKING_DIR"/*.json 2>/dev/null); do
+  n=$(basename "$f" .json)
+  q="$MAIN_REPO/.oddkit/burndown-clarifying-questions/$n.md"
+  [ -f "$q" ] && mv -f "$q" "$MAIN_REPO/.oddkit/burndown-archive-clarifying-questions/$n.md"
+  git -C "$MAIN_REPO" worktree remove --force ".oddkit/worktrees/burndown-issue-$n" 2>/dev/null
+done
+```
+
 ## Phase 1 — Decide: fresh, resume-mid-classify, or resume-mid-ship
 
 Three mutually exclusive cases — check in this order:
