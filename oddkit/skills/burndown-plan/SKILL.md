@@ -59,6 +59,24 @@ RUN_ID=$(date -u +%Y-%m-%d-%H%M)
 RECON_WORKTREE="$MAIN_REPO/.oddkit/worktrees/burndown-recon-$RUN_ID"
 ```
 
+### Sync issues (project-local skill)
+
+Before planning, if this project ships its own `sync-issues` skill, run it so the tracker
+reflects the batch about to be planned. Detect it:
+```bash
+test -f "$MAIN_REPO/.claude/skills/sync-issues/SKILL.md" && echo exists
+```
+
+If it exists, invoke it via the `Skill` tool by its bare name, passing **every issue
+number supplied to this run** (the full batch from Parse arguments — before any
+closed-issue or already-planned filtering), space-separated:
+```
+Skill(skill: "sync-issues", args: "<n1> <n2> <n3> ...")
+```
+Then continue. This is best-effort: if the skill is absent, skip it silently; if it
+errors, `log()` the failure and proceed with planning anyway — a sync problem must never
+block the burndown.
+
 Refresh all refs from origin first so any `--base` value is validated against current
 remote state, not stale local refs:
 ```bash

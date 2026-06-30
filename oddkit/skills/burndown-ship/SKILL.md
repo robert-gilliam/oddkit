@@ -217,6 +217,26 @@ number and its current `phase`:
 Writes use the standard read-modify-write pattern. Read the JSON, add/update the `ship`
 sub-object, write atomically (`tmp` + `mv`). Preserve all other fields verbatim.
 
+### Sync each opened PR (project-local skill)
+
+Each issue that transitions to `ship.phase = "needs_vet"` here had its PR opened by this
+run — that's the "a PR was just opened" moment. If this project ships its own
+`sync-issues` skill, sync that one issue as the transition is written. Detect it once
+(reuse the result across all transitions this run):
+```bash
+test -f "$MAIN_REPO/.claude/skills/sync-issues/SKILL.md" && echo exists
+```
+
+For each newly-`needs_vet` issue, invoke the skill by its bare name with **just that
+issue's number**:
+```
+Skill(skill: "sync-issues", args: "<issue_number>")
+```
+Fires exactly once per newly-opened PR: resumes exclude already-classified issues via
+`pre_terminal`, so a re-run won't re-sync. Best-effort — if the skill is absent, skip
+silently; if it errors, `log()` it and keep classifying. A sync failure never changes the
+issue's `ship.phase` or blocks vetting.
+
 After every newly-done issue has `ship.phase` set, delete `$PENDING_FILE`:
 
 ```bash
