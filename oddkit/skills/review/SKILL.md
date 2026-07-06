@@ -205,6 +205,18 @@ Store as `VERDICT`. Map to the GitHub review event:
 
 Store as `REVIEW_EVENT`.
 
+**Self-authored PRs can't be approved.** GitHub rejects an APPROVE review from the PR's
+own author (422), and PRs opened by this pipeline share the reviewer's `gh` account.
+Before posting, compare authors:
+
+```bash
+gh pr view <PR_NUMBER> --json author --jq .author.login
+gh api user --jq .login
+```
+
+If they match and `REVIEW_EVENT` is `"APPROVE"`, downgrade it to `"COMMENT"` — the
+verdict still leads the review body, so no signal is lost.
+
 ## Step 4 — Output results
 
 ### File review or local review (no PR reference)

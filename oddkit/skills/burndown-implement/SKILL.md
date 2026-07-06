@@ -43,7 +43,8 @@ was planned.
 separate calls or `git -C <path>`. Applies to you and every subagent.
 
 **Model strategy.** Orchestrator is sonnet. Pass `model:` explicitly on every Agent call:
-- plan generation → sonnet
+- plan generation → opus (one agent per complex issue, and the plan determines
+  everything downstream — this is the wrong place to save tokens)
 - simple-issue implementation → sonnet
 - complex-issue implementation → opus
 - `@oddkit:intent-checker` (within impl agents) → opus (its default)
@@ -142,16 +143,16 @@ After this scan you have:
 - **Skipped (invalid base branch)** — reported at end
 - **Skipped (incomplete plan)** — reported at end
 
-Reporting in Phase 6 only covers the run set plus the skipped lists above. Issues
+Reporting in Phase 5 only covers the run set plus the skipped lists above. Issues
 already in terminal phases from prior runs don't show up.
 
 After the scan, each run-set issue has its final `base_branch` set in tracking JSON —
 either from plan's default or from the clarifications answer just resolved above.
 
-## Phase 3 — Generate plans for complex issues
+## Phase 2 — Generate plans for complex issues
 
 For each `complex` issue with no `plan_file` set, spawn a plan-generation Agent — see
-`references/plan-handoff.md`. **`model: sonnet`**. Run all plan generations in parallel
+`references/plan-handoff.md`. **`model: opus`**. Run all plan generations in parallel
 in one message.
 
 Each agent writes its plan to `$MAIN_REPO/.oddkit/burndown-plans/<n>.plan.md`. After it
@@ -159,7 +160,7 @@ returns, update the tracking file: set `plan_file` to that path. `phase` stays `
 
 Simple issues skip planning — implemented directly from issue + recon + clarifications.
 
-## Phase 4 — Fan out implementation
+## Phase 3 — Fan out implementation
 
 The only prompt in the whole flow is the in-progress re-spawn question from Phase 1.
 From here on the orchestrator never asks the developer anything else. Each impl agent
@@ -175,7 +176,7 @@ parallel siblings keep running.
   dependent as `phase: "blocked"`, set their tracking accordingly, and skip — don't
   propagate a broken base.
 - **Already done**: post evidence comment (see `references/comments.md`). Phase is
-  already `already_done` from plan; no worktree, no agent. Skip to Phase 5.
+  already `already_done` from plan; no worktree, no agent. Skip to Phase 4.
 
 ### Per-issue worktree path
 
@@ -242,7 +243,7 @@ If a file with the same name already exists in the archive (rare — only happen
 re-plan + re-ship cycle on the same issue), `mv -f` overwrites it. The most recent
 shipped version is what matters.
 
-## Phase 5 — Post resolution comments
+## Phase 4 — Post resolution comments
 
 The orchestrator (you) posts every comment. Never the impl agent. This keeps formatting
 consistent and gives a single retry path.
@@ -262,7 +263,7 @@ the same run.
 `comment_error: null` (and the absence of a pending comment file) is the implicit signal
 that the comment posted. No separate `comment_posted` flag.
 
-## Phase 6 — Finalize and report
+## Phase 5 — Finalize and report
 
 Print, scoped to issues this run actually touched:
 
@@ -309,9 +310,9 @@ Omit any section that has zero entries — keep the report dense.
 
 **If invoked by burndown-ship:** when you printed `## burndown-implement done` you are
 still in the same conversation that started burndown-ship. There is no separate
-orchestrator to return to — you ARE burndown-ship, and burndown-ship's Phases 3–7
-(classify, vet, review, feedback, summary) are still ahead of you. Do not say "handing
-off" or "returning to the parent." Your next action is burndown-ship's Phase 3.
+orchestrator to return to — you ARE burndown-ship, and burndown-ship's Phases 3–8
+(classify, vet, review, feedback, CI gate, summary) are still ahead of you. Do not say
+"handing off" or "returning to the parent." Your next action is burndown-ship's Phase 3.
 
 ## Resume semantics
 

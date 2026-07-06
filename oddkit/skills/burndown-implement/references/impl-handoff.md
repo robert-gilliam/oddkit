@@ -45,7 +45,7 @@ file must always be consistent.
 mutate only the fields named for that checkpoint, and write the whole object back.
 Never build the file from scratch with just the fields you know about — doing so silently
 drops fields the orchestrator owns and depends on later (e.g. `clarifications_file`,
-which the archive step in Phase 4 reads to move the answered questions out of the active
+which the archive step in Phase 3 reads to move the answered questions out of the active
 directory; if you drop it, the archive no-ops and the file is stranded). Preserve every
 key you didn't explicitly change, including ones not documented here.
 
