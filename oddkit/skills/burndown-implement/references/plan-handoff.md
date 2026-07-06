@@ -1,7 +1,8 @@
 # Plan-generation agent handoff
 
-Send this as the prompt when spawning a plan-generation Agent. Spawn with `model: sonnet`
-— plans are structured output, not heavy reasoning. Substitute the bracketed placeholders.
+Send this as the prompt when spawning a plan-generation Agent. Spawn with `model: opus`
+— the plan determines everything the impl agent does downstream, so this is where
+reasoning pays. Substitute the bracketed placeholders.
 
 The plan agent reads and writes state files in `$MAIN_REPO/.oddkit/` — paths below are
 absolute. It doesn't need a code worktree; everything it needs is on disk.

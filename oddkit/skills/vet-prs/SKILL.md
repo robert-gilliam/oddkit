@@ -134,6 +134,15 @@ Store per PR:
 - `pr.additions`, `pr.deletions`, `pr.changed_files`
 - `pr.head_sha`
 
+### Intent baseline (linked issue)
+
+If the PR body references an issue (`Closes #<n>`, `Fixes #<n>`, `Resolves #<n>`) and a
+cached issue description exists at `.oddkit/burndown-issue-descriptions/<n>.md`
+(burndown PRs always have both), read it and store it as `pr.issue_body`. Grading the
+diff against the PR description alone has a blind spot for agent-authored PRs: the same
+agent wrote both, so intent=✓ only measures self-consistency. The issue says what was
+actually asked for — that's the baseline that matters.
+
 ### Size cap
 
 If a single PR's diff exceeds 3000 lines, **do not send the full diff to the agent**.
@@ -171,6 +180,13 @@ review. Spend your tokens on judgment, not exploration.
 ## PR description
 {body, or "(no description)"}
 
+{If pr.issue_body exists:}
+## Linked issue (intent baseline)
+The PR closes this issue. Grade Intent against what the issue asks for, not just the
+PR description — the description was written by the same author as the diff.
+{issue body}
+{Omit this section entirely when there is no cached issue.}
+
 ## Files changed
 {file list, one per line}
 
@@ -188,12 +204,15 @@ Return three grades and a one-line rationale for each. Be terse. Use the exact s
   - `M` = medium, multiple files or a non-trivial single file
   - `L` = large, spans many areas or is a major change
 
-**Intent** — does the diff match what the PR description claims?
+**Intent** — does the diff match what the PR description claims? (When a linked issue
+is provided above, the issue is the baseline: grade whether the diff delivers what the
+issue asks for, including anything the issue requires that the diff doesn't touch.)
   - `✓` = diff does what the description says, nothing surprising
   - `⚠️` = mostly aligned, but the diff also does something the description doesn't
-        mention (e.g., unrelated refactor, dropped tests, scope creep)
+        mention (e.g., unrelated refactor, dropped tests, scope creep) — or delivers
+        only part of what the linked issue asks for
   - `✗` = diff and description disagree, OR there's no description and the change is
-        non-obvious
+        non-obvious, OR the diff misses the point of the linked issue
   Empty descriptions on tiny obvious PRs (single-line fixes, dep bumps) are still `✓`.
 
 **Smell** — any visible red flags in the diff itself?
@@ -418,6 +437,10 @@ No worktree cleanup needed — this skill creates none.
   re-vet on one PR without affecting others.
 - **Comments are upserted.** The `<!-- oddkit:vet-prs -->` marker lets a re-run replace
   its own comment in place. Never post duplicates.
+- **The Concerns comment is a contract.** In the burndown-ship pipeline, PRs routed to
+  address-feedback get their vet concerns *from the posted comment* — it's the only
+  channel carrying the verdict onto the PR. Keep the Concerns section in the comment,
+  and treat a failed post on a flagged PR as worth surfacing loudly in the report.
 - **Parse errors are surfaced, not retried.** If the triage agent returns malformed
   output, the report calls it out and skips posting. Cheap to re-run the whole skill if
   needed; not worth building a retry loop into v1.

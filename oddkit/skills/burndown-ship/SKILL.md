@@ -66,11 +66,12 @@ state) is untouched.
 | Phase                       | Meaning                                                            | Next action                                  |
 |-----------------------------|--------------------------------------------------------------------|----------------------------------------------|
 | `needs_vet`                 | PR was opened this run; not yet triaged                            | Phase 4 — vet-prs                            |
-| `vetted_clean` *(terminal)* | vet returned smell=clean + intent=✓                                | Done                                         |
 | `needs_address_feedback`    | vet flagged iffy/⚠️/✗ at S/M scope                                  | Phase 6 — address-feedback                   |
 | `needs_deep_review`         | vet flagged red, or iffy/⚠️/✗ at L scope                            | Phase 5 — review, then address-feedback      |
-| `shipped` *(terminal)*      | All routing actions complete                                       | Done                                         |
-| `ship_failed` *(terminal)*  | A sub-skill failed for this PR; other PRs not affected             | Surface in summary; manual recovery          |
+| `needs_ci`                  | Routing actions complete; CI verdict not yet confirmed             | Phase 7 — CI gate                            |
+| `vetted_clean` *(terminal)* | vet returned smell=clean + intent=✓, CI green                      | Done                                         |
+| `shipped` *(terminal)*      | All routing actions complete, CI green                             | Done                                         |
+| `ship_failed` *(terminal)*  | A sub-skill or CI failed for this PR; other PRs not affected       | Surface in summary; manual recovery          |
 | `ship_not_eligible` *(terminal)* | burndown-implement didn't produce a PR (failed/blocked/skipped) | Surface in summary; manual recovery          |
 
 Companion fields on the `ship` object:
@@ -79,7 +80,10 @@ Companion fields on the `ship` object:
 - `vet_route` (`"done" | "feedback" | "review"`) — the routing decision in Phase 4
 - `review_done_at` (iso utc) — set when Phase 5 completes for this PR
 - `feedback_done_at` (iso utc) — set when Phase 6 completes for this PR
+- `ci_status` (`"pass" | "fail" | "none" | "pending"`) — written in Phase 7
 - `failure_reason` (string) — set if `ship.phase == "ship_failed"`
+- `reason` (string) — set if `ship.phase == "ship_not_eligible"` (why no PR existed;
+  not a failure field — `already_done` lands here too)
 
 ## Startup checklist
 
@@ -92,13 +96,14 @@ TaskCreate: "burndown-ship Phase 3 — classify new PRs"
 TaskCreate: "burndown-ship Phase 4 — vet PRs"
 TaskCreate: "burndown-ship Phase 5 — deep review"
 TaskCreate: "burndown-ship Phase 6 — address feedback"
-TaskCreate: "burndown-ship Phase 7 — print summary"
+TaskCreate: "burndown-ship Phase 7 — CI gate"
+TaskCreate: "burndown-ship Phase 8 — print summary"
 ```
 
 Mark each task done only when that phase actually completes. **burndown-implement's
 `## burndown-implement done` report is NOT your completion signal — it's just a line
 of text you wrote inside the same conversation. You ARE burndown-ship, and you must
-complete every phase through Phase 7 before this skill is done.**
+complete every phase through Phase 8 before this skill is done.**
 
 ## Phase 0 — Preflight
 
@@ -228,8 +233,8 @@ number and its current `phase`:
 |----------------------|--------------------------------|-----------------------------------------------------------------|
 | Yes                  | (any)                          | Leave alone — old work, not from this run                       |
 | No                   | `done` + `pr_url` set          | Set `ship.phase = "needs_vet"`, `ship.started_at = <RUN_TS>`    |
-| No                   | `failed` / `blocked`           | Set `ship.phase = "ship_not_eligible"`, `ship.failure_reason = "burndown-implement: <phase>"` |
-| No                   | `already_done`                 | Set `ship.phase = "ship_not_eligible"`, `ship.failure_reason = "burndown-implement: already_done (no PR to ship)"` |
+| No                   | `failed` / `blocked`           | Set `ship.phase = "ship_not_eligible"`, `ship.reason = "burndown-implement: <phase>"` |
+| No                   | `already_done`                 | Set `ship.phase = "ship_not_eligible"`, `ship.reason = "burndown-implement: already_done (no PR to ship)"` |
 | No                   | non-terminal (pending/etc.)    | Leave alone — burndown-implement skipped it (unanswered, etc.)  |
 
 Writes use the standard read-modify-write pattern. Read the JSON, add/update the `ship`
@@ -262,7 +267,7 @@ rm -f "$PENDING_FILE"
 ```
 
 If no issues ended up with `ship.phase = "needs_vet"`, the pipeline has nothing to vet.
-Skip ahead to Phase 7 and print the summary (which will only contain ship_not_eligible
+Skip ahead to Phase 8 and print the summary (which will only contain ship_not_eligible
 entries plus a "no PRs created" headline).
 
 ## Phase 4 — Vet new PRs
@@ -272,7 +277,7 @@ empty.
 
 Extract `(issue_number, pr_number)` pairs by parsing `pr_url` from each tracking file
 (e.g. `https://github.com/owner/repo/pull/45` → `pr_number = 45`). Store this mapping
-locally — you'll need it through Phase 6.
+locally — you'll need it through Phase 7.
 
 Invoke vet-prs with the explicit PR list:
 
@@ -309,7 +314,7 @@ needs_action = (smell != "clean") OR (intent != "✓")
 
 if not needs_action:
     ship.vet_route = "done"
-    ship.phase     = "vetted_clean"     # terminal
+    ship.phase     = "needs_ci"         # terminal only after CI confirms (Phase 7)
 elif smell == "red" or scope == "L":
     ship.vet_route = "review"
     ship.phase     = "needs_deep_review"
@@ -319,9 +324,14 @@ else:
     ship.phase     = "needs_address_feedback"
 ```
 
-Plain-English: a PR that comes back clean *and* matches its stated intent is done.
-Anything else needs action. Red smell or any large/risky change gets a deep review
-first; smaller suspicious PRs go straight to address-feedback.
+Plain-English: a PR that comes back clean *and* matches its stated intent goes straight
+to the CI gate. Anything else needs action first. Red smell or any large/risky change
+gets a deep review; smaller suspicious PRs go straight to address-feedback.
+
+The feedback route has a load-bearing dependency: vet-prs posts its Concerns as a PR
+comment, and that comment is what address-feedback ingests in Phase 6. If vet's comment
+failed to post for a PR routed `"feedback"`, note it now — Phase 6 uses this to tell a
+legitimate "nothing to address" apart from "the concerns never landed."
 
 Also write `ship.vet_verdict = {scope, intent, smell}` so the summary can quote it
 later without re-reading vet-prs state.
@@ -331,8 +341,11 @@ later without re-reading vet-prs state.
 Build the **review set**: every issue with `ship.phase == "needs_deep_review"`. Skip
 this phase if empty.
 
-Process one PR at a time. `oddkit:review` posts to GitHub and writes commits; running
-them in parallel risks rate limits and is hard to recover from on failure.
+Process one PR at a time, **chain heads first**: if any issue in the set appears in
+another tracking file's `blocked_by`, it's a predecessor in a stacked chain — handle it
+before its dependents so fixes land upstream before downstream PRs get touched.
+`oddkit:review` posts to GitHub and writes commits; running them in parallel risks rate
+limits and is hard to recover from on failure.
 
 For each PR in the review set, in order, invoke the `oddkit:review` skill by its full
 namespaced name (not a bare `review`, which may resolve to a different skill):
@@ -355,43 +368,107 @@ Build the **feedback set**: every issue with `ship.phase == "needs_address_feedb
 This includes both PRs routed straight from vet (iffy/wrong-intent at S/M) and PRs that
 just finished Phase 5's deep review. Skip this phase if empty.
 
-Process one PR at a time. For each PR in the feedback set, in order:
+Process one PR at a time, **chain heads first** (same ordering rule as Phase 5: an issue
+listed in another tracking file's `blocked_by` is a predecessor — do it before its
+dependents). For each PR in the feedback set, in order:
 
 ```
 Skill(skill: "oddkit:address-feedback", args: "#<pr_number> --yolo")
 ```
 
 When it returns:
-- **Success**: write `ship.phase = "shipped"` (terminal),
+- **Success**: write `ship.phase = "needs_ci"`,
   `ship.feedback_done_at = <now utc>`. Move on.
 - **Failure**: write `ship.phase = "ship_failed"`,
   `ship.failure_reason = "address-feedback: <one-line reason>"`. Move on.
 
-Detect failure conservatively: the address-feedback skill exits cleanly even when
-nothing actionable was found (zero unresolved comments). That's a success, not a
-failure — there was simply no feedback to address. Only flag failure when the skill
-clearly errored (push rejected, comment-post failed, exception thrown).
+Detect failure conservatively — with one exception. The address-feedback skill exits
+cleanly even when nothing actionable was found (zero unresolved comments). Whether
+that's a success depends on how the PR got here:
+- **`vet_route == "review"`**: zero actionable comments is legitimate — Phase 5's review
+  may have found nothing worth an inline comment. Success.
+- **`vet_route == "feedback"`**: the vet concerns comment was the entire reason for this
+  route. Zero actionable comments means those concerns never reached the PR (comment
+  failed to post, or was filtered out). Write `ship.phase = "ship_failed"`,
+  `ship.failure_reason = "feedback route: vet concerns never landed on the PR"` — don't
+  mark a PR shipped when the thing it was flagged for was never looked at.
 
-## Phase 7 — Summary
+Otherwise only flag failure when the skill clearly errored (push rejected, comment-post
+failed, exception thrown).
+
+**Stale chain dependents.** If address-feedback pushed commits to a PR that other issues
+stack on (its issue number appears in their `blocked_by`), those dependent PRs now have a
+stale base. Don't rebase them automatically — record the dependents locally and surface
+them in Phase 8's summary as needing a manual rebase.
+
+## Phase 7 — CI gate
+
+Build the **CI set**: every issue with `ship.phase == "needs_ci"`. Skip this phase if
+empty.
+
+Local checks at implement time are a proxy; CI green is the actual bar for
+"merge-ready." Nothing goes terminal-happy without it. For each PR in the CI set, wait
+for its checks (timebox each `--watch` call to ~10 minutes via the Bash tool timeout):
+
+```bash
+gh pr checks <pr_number> --watch
+```
+
+Read the outcome:
+- **All checks pass** → `ship.ci_status = "pass"`. Transition by route:
+  `vet_route == "done"` → `ship.phase = "vetted_clean"`; anything else →
+  `ship.phase = "shipped"`. Both terminal.
+- **No checks reported** (repo has no CI configured for this base) →
+  `ship.ci_status = "none"`. Same transitions as pass — there's nothing to gate on.
+  Note it in the summary line so "green" isn't overstated.
+- **Any check fails** → `ship.ci_status = "fail"`, `ship.phase = "ship_failed"`,
+  `ship.failure_reason = "ci: <failing check name(s)>"`. Move on; other PRs are
+  unaffected.
+- **Still pending at the timebox** → `ship.ci_status = "pending"` and leave
+  `ship.phase = "needs_ci"`. Don't guess. The summary lists it, and a later re-run of
+  `/oddkit:burndown-ship` re-checks it (resume Case B picks up `needs_ci` as
+  non-terminal).
+
+Write tracking after each PR's verdict — don't batch.
+
+## Phase 8 — Summary
 
 Scan all tracking files. For each issue that has a `ship` sub-object (regardless of
-phase), group by `ship.phase` and print:
+phase), group by `ship.phase`. Also scan for issues with **no** `ship` sub-object whose
+`phase` is `implementing` — those are stuck mid-implementation from an interrupted run,
+invisible to every `--yolo` re-run until a human intervenes, and this summary is the
+only place the walk-away developer will hear about them. Print:
 
 ```
 ## Burndown ship complete — <YYYY-MM-DD HH:mm UTC>
 
 ### Shipped clean ({A})
-- #123 (PR <pr_url>) — vet: S/✓/clean. No action needed.
+- #123 (PR <pr_url>) — vet: S/✓/clean, CI: pass. No action needed.
 
 ### Shipped after feedback ({B})
-- #124 (PR <pr_url>) — vet: M/✓/iffy → address-feedback. Done.
+- #124 (PR <pr_url>) — vet: M/✓/iffy → address-feedback, CI: pass. Done.
 
 ### Shipped after review + feedback ({C})
-- #125 (PR <pr_url>) — vet: L/⚠️/iffy → review + address-feedback. Done.
-- #126 (PR <pr_url>) — vet: M/✓/red → review + address-feedback. Done.
+- #125 (PR <pr_url>) — vet: L/⚠️/iffy → review + address-feedback, CI: pass. Done.
+- #126 (PR <pr_url>) — vet: M/✓/red → review + address-feedback, CI: none (no CI configured). Done.
+
+### Awaiting CI ({F})
+- #131 (PR <pr_url>) — checks still running at timeout. Re-run /oddkit:burndown-ship to
+  re-check, or watch: gh pr checks <n> --watch
 
 ### Failed during ship ({D})
 - #127 (PR <pr_url>) — review: <reason>. Manual recovery needed.
+- #132 (PR <pr_url>) — ci: lint failing. Manual recovery needed.
+
+### Chain rebase needed ({G})
+- #456 (PR <pr_url>) — base PR #123 got new commits during address-feedback. Rebase the
+  branch on the updated base before merging.
+
+### Stuck in progress ({H})
+- #321 — phase: implementing since <updated_at>, no ship state. A previous run was
+  interrupted mid-implementation; --yolo never re-spawns these. To recover: confirm no
+  agent is still running, then set phase to "ready" in
+  .oddkit/burndown-issue-tracking/321.json and re-run.
 
 ### Not eligible ({E})
 - #128 — burndown-implement: failed. See tracking file for details.
@@ -402,7 +479,7 @@ phase), group by `ship.phase` and print:
 - Failed-during-ship issues: inspect the PR, then either clear `ship.phase` in the
   tracking file (and re-run /oddkit:burndown-ship) or finish the work by hand.
 - Not-eligible issues: check `.oddkit/burndown-issue-tracking/<n>.json`'s `phase` and
-  `failure_reason`. Re-plan or retry per the burndown-implement skip rules.
+  `ship.reason`. Re-plan or retry per the burndown-implement skip rules.
 ```
 
 Omit any section that has zero entries — keep the report dense. If everything ended in
@@ -419,12 +496,13 @@ Re-running `/oddkit:burndown-ship` is always safe. The skill checks:
    burndown-implement with an expanded `pre_terminal` (issues already in the ship
    pipeline are excluded from re-classification). Any issues the developer has since
    answered or unblocked get picked up. Then continues Phase 4+ for all non-terminal
-   ship issues.
+   ship issues — including `needs_ci` issues whose checks were still pending last run.
 3. **Neither** → fresh run (Case C). Runs burndown-implement from scratch.
 
 Manual recovery:
 - To **retry a `ship_failed` issue**: set its `ship.phase` to the step you want to resume
-  from (`needs_address_feedback` or `needs_deep_review`) and re-run. Note that any
+  from (`needs_address_feedback`, `needs_deep_review`, or `needs_ci` for a CI failure
+  you've since fixed by hand) and re-run. Note that any
   half-completed work — e.g. a posted review — stays on the PR; if you resume from
   `needs_deep_review` after the review already posted, you'll get a second one. Prefer
   resuming from `needs_address_feedback` unless the review never landed.
@@ -450,9 +528,9 @@ cases, exit with a clear message and don't try to "make progress" anyway.
   trap is mental, not behavioral: you read the `## burndown-implement done` report and
   think a sub-skill just returned control to some external orchestrator. That
   orchestrator does not exist. burndown-implement's instructions ran inside this same
-  conversation — you wrote that report. Phases 3–7 (classify, vet, review, feedback,
-  summary) are still ahead of you, and "you" means the same Claude that just finished
-  Phase 2. Do not end the turn there.
+  conversation — you wrote that report. Phases 3–8 (classify, vet, review, feedback,
+  CI gate, summary) are still ahead of you, and "you" means the same Claude that just
+  finished Phase 2. Do not end the turn there.
 - **All sub-skill invocations go through the Skill tool**, not through Bash or Agent.
   This keeps the user's experience consistent — slash commands and Skill invocations
   funnel through the same loaders.

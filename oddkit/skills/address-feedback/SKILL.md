@@ -134,7 +134,22 @@ properly. No commit, no fix.
 
 Group commits when multiple comments share a root cause.
 
-## Phase 6 — Confirm
+### Verify before push — match what CI runs
+
+After all fixes are committed, run the project's verification commands from `WORK_DIR`,
+the same way CI will. Detect what exists and run all of it: `package.json` scripts
+(`lint`, `typecheck`, `test`, `build`, plus any `check`/`ci`/`verify` aggregator),
+`Makefile` targets, or ecosystem equivalents (`go vet` + `go test`, `cargo clippy` +
+`cargo test`, ruff/mypy/pytest, etc.). Install dependencies first if the worktree is
+fresh.
+
+If a command fails, the failure came from this session's commits — fix it before
+moving on. If a second attempt doesn't get it green, drop the offending change
+(`git reset` the commit), reclassify that item as Defer, and say what happened in the
+reply. **Never push commits that fail local verification** — a fix that breaks CI is
+worse than the issue it addressed.
+
+If the project has no verification commands at all (rare), note that in the summary.
 
 Present summary:
 

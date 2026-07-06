@@ -6,9 +6,7 @@ description: >
   for the developer to answer offline. Pairs with /oddkit:burndown-implement, which ships
   any planned issue whose questions have been answered (or didn't need any). Use when the
   developer wants to prep a batch of issues and walk away — "set up a burndown", "prep
-  these issues", "draft burndown questions for #X #Y", or "/oddkit:burndown-plan". Always
-  pick this over the interactive /oddkit:burndown when async clarification beats a
-  realtime Q&A.
+  these issues", "draft burndown questions for #X #Y", or "/oddkit:burndown-plan".
 argument-hint: "[--base <branch>] <issue refs...>"
 model: sonnet
 ---
@@ -400,8 +398,9 @@ Skip if `burndown-open-prs.json` has no PRs. Otherwise, for each issue:
    *relevant* if `intersection` is non-empty.
 3. Pick the suggestion:
    - 0 relevant PRs → `pr_suggestion = null`.
-   - 1+ relevant PRs → pick the one with the largest `updatedAt` (most recently updated).
-     Intersection size is not a tiebreaker — recency wins.
+   - 1+ relevant PRs → pick the one with the largest `intersection` (most overlapping
+     files — the strongest signal that the issue builds on that PR's work). Tie →
+     most recent `updatedAt` wins.
 4. Write `pr_suggestion` to tracking JSON when non-null:
    ```json
    "pr_suggestion": {
