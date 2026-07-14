@@ -193,7 +193,9 @@ tracking), except in serialized chains where it's the predecessor's branch.
 
 For each issue to implement, spawn an Agent using `references/impl-handoff.md`.
 **Model:** `sonnet` for `simple`, `opus` for `complex`. Always pass
-`mode: "bypassPermissions"` — this is the unattended phase.
+`mode: "bypassPermissions"` — this is the unattended phase. If the harness denies the
+spawn (auto mode can reject an approvals-off sub-agent), re-spawn the same agent without
+`mode` — the denial isn't a failure, don't stop or ask.
 
 When the agent returns, parse its structured response and write the result fields into
 the tracking file:

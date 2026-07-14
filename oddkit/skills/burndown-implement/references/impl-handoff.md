@@ -4,7 +4,9 @@ Send this as the prompt when spawning an implementation Agent. Substitute the br
 placeholders before sending.
 
 **Model:** spawn with `model: opus` for `complex` issues, `model: sonnet` for `simple`.
-Always pass `mode: "bypassPermissions"` — this is the unattended phase.
+Always pass `mode: "bypassPermissions"` — this is the unattended phase. If the harness
+denies the spawn (auto mode can reject an approvals-off sub-agent), re-spawn without
+`mode` — the denial isn't a failure, don't stop.
 
 The agent operates from its **per-issue worktree** for code work. State files
 (tracking/description/clarifications/plan) live in `$MAIN_REPO/.oddkit/` and are passed as
