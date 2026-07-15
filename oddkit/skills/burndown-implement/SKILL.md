@@ -183,8 +183,12 @@ parallel siblings keep running.
 Refs were refreshed in Phase 1, so every `origin/<base_branch>` is current. Each
 implementation agent creates its own worktree at:
 ```
-$MAIN_REPO/.oddkit/worktrees/burndown-issue-<n>
+$MAIN_REPO/.claude/worktrees/burndown-issue-<n>
 ```
+This lives under `.claude/worktrees/` (not `.oddkit/`) so the impl agent can enter it to
+edit without tripping the harness's permission-root relocation prompt — that guard fires
+only for worktrees outside `.claude/worktrees/`, and `bypassPermissions` doesn't suppress
+it. Durable burndown state stays in `.oddkit/`; only the ephemeral code checkout moves.
 
 Branch name: `burndown/issue-<n>-<slug>`. Branch off `origin/<base_branch>` (from
 tracking), except in serialized chains where it's the predecessor's branch.

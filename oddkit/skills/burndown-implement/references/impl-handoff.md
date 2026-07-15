@@ -32,7 +32,7 @@ separate calls or `git -C <path>`.
   state the change targets.
 - Plan: `[<main-repo>/.oddkit/burndown-plans/<n>.plan.md]` or `null` (simple issues — implement from issue + recon + clarifications)
 - Base branch: `[main | <predecessor branch>]`
-- Per-issue worktree to create: `[<main-repo>/.oddkit/worktrees/burndown-issue-<n>]`
+- Per-issue worktree to create: `[<main-repo>/.claude/worktrees/burndown-issue-<n>]`
 - Branch to create: `[burndown/issue-<n>-<slug>]`
 
 ## State updates

@@ -38,9 +38,10 @@ non-terminal `ship.phase`. A single transient file
 recoverable.
 
 **No new folders.** Everything lives in existing `.oddkit/` conventions: tracking files
-get a `ship` field, vet-prs writes to its own `.oddkit/vet-prs/`, worktrees go under
-`.oddkit/worktrees/`. The one transient file is deleted as soon as classification is
-done.
+get a `ship` field, vet-prs writes to its own `.oddkit/vet-prs/`. Per-issue code worktrees
+go under `.claude/worktrees/` (so the impl agent can enter them to edit without the
+permission-root relocation prompt); durable state stays in `.oddkit/`. The one transient
+file is deleted as soon as classification is done.
 
 **Shell rule:** never combine `cd` and `git` in a single compound bash command. Use
 separate calls or `git -C <path>`. Applies to you and every subagent.
@@ -137,7 +138,7 @@ for f in $(grep -lE '"phase"[[:space:]]*:[[:space:]]*"done"' "$TRACKING_DIR"/*.j
   n=$(basename "$f" .json)
   q="$MAIN_REPO/.oddkit/burndown-clarifying-questions/$n.md"
   [ -f "$q" ] && mv -f "$q" "$MAIN_REPO/.oddkit/burndown-archive-clarifying-questions/$n.md"
-  git -C "$MAIN_REPO" worktree remove --force ".oddkit/worktrees/burndown-issue-$n" 2>/dev/null
+  git -C "$MAIN_REPO" worktree remove --force ".claude/worktrees/burndown-issue-$n" 2>/dev/null
 done
 ```
 

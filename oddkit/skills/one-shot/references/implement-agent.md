@@ -26,7 +26,7 @@ calls or `git -C <path>`.
 - Plan (complex tasks only, else "none"): `[<plan text>]`
 - Base branch: `[<BASE_BRANCH>]`
 - Closes issue: `[#<n>]` or "none"
-- Worktree to create: `[<main-repo>/.oddkit/worktrees/one-shot-impl]`
+- Worktree to create: `[<main-repo>/.claude/worktrees/one-shot-impl]`
 - Branch to create: `[one-shot/<short-slug>]`
 
 ## Steps
