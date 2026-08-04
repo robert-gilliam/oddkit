@@ -409,13 +409,22 @@ empty.
 
 Local checks at implement time are a proxy; CI green is the actual bar for
 "merge-ready." Nothing goes terminal-happy without it. For each PR in the CI set, wait
-for its checks (timebox each `--watch` call to ~10 minutes via the Bash tool timeout):
+for its checks with two separate Bash calls — the first waits, the second takes the
+snapshot the verdict is read from. Separate calls mean the timebox killing the watch
+can't eat the snapshot, and the refreshing `--watch` table never streams into your
+context:
 
 ```bash
-gh pr checks <pr_number> --watch
+gh pr checks <pr_number> --watch > /dev/null 2>&1   # call 1: wait (timebox ~10 min via the Bash tool timeout)
+gh pr checks <pr_number>                            # call 2: one snapshot for the verdict
 ```
 
-Read the outcome:
+Determine pass/fail/pending/none from call 2's snapshot output, not the exit code
+alone — `gh pr checks` exits 1 for both "a check failed" and "no checks configured"
+(pass = 0, pending = 8). If call 1 hit the timebox, the snapshot still shows current
+state for the `pending` branch.
+
+Read the outcome from the snapshot:
 - **All checks pass** → `ship.ci_status = "pass"`. Transition by route:
   `vet_route == "done"` → `ship.phase = "vetted_clean"`; anything else →
   `ship.phase = "shipped"`. Both terminal.

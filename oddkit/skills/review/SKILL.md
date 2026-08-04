@@ -41,16 +41,19 @@ Store `PR_NUMBER`, `PR_BODY`, `HEAD_SHA`, `OWNER`, `REPO`, `TARGET_REF`, `BASE_R
 
 If no PR found, stop: "No open PR found. Push your branch and open a PR first."
 
-Get GitHub's canonical diff — this is the authoritative source for what's in the PR:
+Get GitHub's canonical diff — this is the authoritative source for what's in the PR.
+Write it straight to disk so it never enters your context; agents Read it from the file:
 
 ```bash
-gh pr diff <PR_NUMBER>
+mkdir -p .oddkit/review
+gh pr diff <PR_NUMBER> > .oddkit/review/diff-<PR_NUMBER>-<timestamp>.txt
 gh pr diff <PR_NUMBER> --name-only
 ```
 
-Store the diff as `PR_DIFF` and the file list as `PR_FILES`.
+Use the same `<timestamp>` as the worktree below so concurrent reviews don't collide.
+Store the diff file's absolute path as `DIFF_FILE` and the file list as `PR_FILES`.
 
-Use `PR_DIFF` for all analysis. Do NOT use `git diff` for GitHub reviews — local diffs can diverge from what GitHub considers part of the PR.
+Use the diff at `DIFF_FILE` for all analysis. Do NOT use `git diff` for GitHub reviews — local diffs can diverge from what GitHub considers part of the PR.
 
 Create a worktree at the PR's head commit so agents search the code as it exists in the PR, not whatever branch you happen to have checked out:
 
@@ -82,13 +85,16 @@ git worktree add .oddkit/worktrees/review-<timestamp> origin/<TARGET_REF> --deta
 ```
 
 ```bash
-git diff <BASE_REF>...<diff_target>
+mkdir -p .oddkit/review
+git diff <BASE_REF>...<diff_target> > .oddkit/review/diff-local-<timestamp>.txt
 git diff <BASE_REF>...<diff_target> --stat
 ```
 
-If diff is empty, stop: "No changes found. Nothing to review."
+Store the diff file's absolute path as `DIFF_FILE`.
 
-If diff exceeds 5,000 lines, warn and ask to confirm.
+If the diff file is empty, stop: "No changes found. Nothing to review."
+
+If the diff exceeds 5,000 lines (`wc -l < "$DIFF_FILE"`), warn and ask to confirm.
 
 ## Step 2 — Detect content type and spawn agents
 
@@ -102,7 +108,8 @@ Pass `FILE_CONTENT` to the agents instead of a diff. Skip to Step 3.
 
 ### If diff
 
-Examine the diff to determine content type:
+Determine content type from the changed file list (`PR_FILES` for GitHub reviews, the
+`--stat` output for local ones) — no need to read the diff itself:
 
 - **Code**: diff contains source files (.ts, .js, .py, .go, .rs, etc.)
 - **Plan/docs**: diff contains only markdown, text, or documentation files
@@ -114,9 +121,10 @@ If mixed, treat as code review (code agents catch what matters most).
 Spawn `@oddkit:correctness`, `@oddkit:intent-checker`, `@oddkit:design-critic` using the Agent tool.
 
 **All three agents** get:
-- The diff (use `PR_DIFF` for GitHub reviews, local diff for local reviews)
+- The diff file path (`DIFF_FILE`), with this instruction: "Read the full unified diff
+  at <abs DIFF_FILE> before doing anything else. It is the change under review."
 - **For GitHub reviews:** the file list (`PR_FILES`) with this instruction: "Only report findings in these files. These are the files in the PR diff."
-- **For GitHub reviews:** "Search the codebase at `REVIEW_ROOT` (not the repo root) for all file reads, globs, and greps."
+- **For GitHub reviews:** "Search the codebase at `REVIEW_ROOT` (not the repo root) for all file reads, globs, and greps — except the diff file at <abs DIFF_FILE>."
 
 **correctness** also gets:
 - No PR description. It reviews the code mechanically — what breaks, what leaks, what's unsafe.
@@ -136,18 +144,18 @@ Each agent must quote exact code snippets from the diff for every finding.
 Spawn `@oddkit:fact-checker`, `@oddkit:completeness-auditor`, `@oddkit:design-critic`.
 
 **fact-checker and completeness-auditor** get:
-- The diff
+- The diff file path (`DIFF_FILE`), with the same read-first instruction
 - PR description (if available)
 - **For GitHub reviews:** the file list with the same scoping instruction
-- **For GitHub reviews:** "Search the codebase at `REVIEW_ROOT` (not the repo root) for all file reads, globs, and greps."
+- **For GitHub reviews:** "Search the codebase at `REVIEW_ROOT` (not the repo root) for all file reads, globs, and greps — except the diff file at <abs DIFF_FILE>."
 
 For fact-checker, also read full file contents (not just diff hunks) so it can verify claims against the codebase.
 
 **design-critic** gets:
-- The diff
+- The diff file path (`DIFF_FILE`), with the same read-first instruction
 - PR description (if available)
 - **For GitHub reviews:** the file list with the same scoping instruction
-- **For GitHub reviews:** "Search the codebase at `REVIEW_ROOT` (not the repo root) for all file reads, globs, and greps."
+- **For GitHub reviews:** "Search the codebase at `REVIEW_ROOT` (not the repo root) for all file reads, globs, and greps — except the diff file at <abs DIFF_FILE>."
 - This framing: "You're reviewing an implementation plan. Here's the plan text. Evaluate whether the proposed design is sound, appropriately scoped, and as simple as it can be. Search the codebase for existing patterns that the plan could leverage."
 
 Each agent must quote exact text from the plan for every finding.
@@ -176,6 +184,9 @@ For EVERY finding:
 3. Check at least 20 lines of surrounding context
 4. Trace code paths (callers, callees, types) as needed (use `REVIEW_ROOT` for GitHub reviews)
 5. Ask: does this issue actually exist, or did the agent misunderstand?
+
+Where verification needs the diff itself (confirming a hunk is part of the change), read
+`DIFF_FILE` — don't refetch it.
 
 **Discard** if:
 - Snippet doesn't exist in the file or diff (hallucinated)
