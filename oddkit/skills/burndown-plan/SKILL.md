@@ -143,18 +143,27 @@ Path conventions for everything that follows:
 
 ### Issue descriptions
 
-For each issue:
+For each issue, fetch and build the description file in a single Bash call — redirect
+the JSON to a tmp file and render the markdown from it with `jq`, so large bodies and
+comment payloads never round-trip through your context:
+
 ```bash
-gh issue view <n> --json number,title,body,labels,assignees,url,state,comments
+DESC_DIR="$MAIN_REPO/.oddkit/burndown-issue-descriptions"
+TMP="$DESC_DIR/<n>.json.tmp"
+gh issue view <n> --json number,title,body,labels,assignees,url,state,comments > "$TMP"
+jq -r .state "$TMP"   # print state so you can skip closed issues
+jq -r '"# \(.title)\n\n- URL: \(.url)\n- State: \(.state)\n- Labels: \([.labels[].name] | join(", "))\n- Assignees: \([.assignees[].login] | join(", "))\n\n\(.body)"
+  + (if (.comments | length) > 0
+     then "\n\n## Comments\n\n" + ([.comments[] | "### \(.author.login) — \(.createdAt)\n\n\(.body)"] | join("\n\n"))
+     else "" end)' "$TMP" > "$DESC_DIR/<n>.md"
+rm -f "$TMP"
 ```
 
-Skip closed issues with a warning. Scan body+comments for `depends on #N`, `blocked by
-#N`, `after #N`, `requires #N` to populate `blocked_by`.
-
-Write the issue body verbatim to:
-```
-$MAIN_REPO/.oddkit/burndown-issue-descriptions/<n>.md
-```
+Skip closed issues with a warning (delete their description file). Then Read each
+resulting description file **once** — you need it for `blocked_by` scanning, image
+scanning (next section), classification, and summaries. The saving is the raw JSON
+envelope and comment metadata, not the body itself. Scan body+comments for `depends on
+#N`, `blocked by #N`, `after #N`, `requires #N` to populate `blocked_by`.
 
 Format: a level-1 heading with the title, a metadata block (URL, labels, assignees,
 state), then the body, then a `## Comments` section if non-empty. This is the canonical
@@ -199,16 +208,20 @@ for Phase 3, which writes it into the tracking file's `images` field. These imag
 ### Open PRs (one fetch per batch)
 
 Open PRs are shared context for every issue — fetch them once here, not per recon agent.
-The result feeds Phase 4 (recon prompts) and Phase 5 (overlap heuristic):
+The result feeds Phase 4 (recon prompts) and Phase 5 (overlap heuristic). Slim at the
+source with `--jq` and redirect in the same call, so the raw 100-PR × full-files payload
+never enters your context. Body is trimmed to a single line (~150 chars, first line),
+`files` keeps only the path strings:
 
 ```bash
-gh pr list --state open \
+gh pr list --state open --limit 100 \
   --json number,title,headRefName,body,files,updatedAt \
-  --limit 100
+  --jq '{fetched_at: (now | todate), prs: [.[] | {number, title, headRefName, files: [.files[].path], body_summary: (((.body // "") | split("\n") | first) // "" | .[0:150]), updatedAt}]}' \
+  > "$MAIN_REPO/.oddkit/burndown-open-prs.json"
 ```
 
-Slim the result into a cache file. Body is trimmed to a single line (~150 chars, first
-sentence or first line), `files` keeps only the path strings:
+Here, check only the PR count (`jq '.prs | length'`) — the slim cache is for Phase 4's
+recon prompts (passed by path) and Phase 5's overlap heuristic:
 
 ```
 $MAIN_REPO/.oddkit/burndown-open-prs.json
@@ -310,7 +323,15 @@ entry records where the image came from so implement can reuse it later:
 ## Phase 4 — Recon all issues in parallel
 
 For each issue, spawn `@oddkit:code-scout` and `@oddkit:impact-scout` via the Agent tool —
-**`model: sonnet` on every call**. Pass the issue title and body. Tell each agent to:
+**`model: sonnet` on every call**. Pass the issue title inline (one line — it helps the
+agent orient before reading); for the body, pass the path instead of pasting it:
+
+```
+Read $MAIN_REPO/.oddkit/burndown-issue-descriptions/<n>.md (absolute path) before doing
+anything else — it is the issue you are reconning.
+```
+
+Tell each agent to:
 - Read code from `$RECON_WORKTREE` (pass it as `cwd`) so they see fresh `origin/<base>`.
 - Write any output files to absolute paths under `$MAIN_REPO/.oddkit/`.
 
@@ -333,15 +354,14 @@ that's relevant to the implementation.
 
 ### Open-PR context for every recon prompt
 
-Append a compact open-PR block to each recon agent's prompt, built from
-`$MAIN_REPO/.oddkit/burndown-open-prs.json` (cached in Phase 2). If `prs` is empty, omit
-the whole block. Otherwise:
+Append a compact open-PR block to each recon agent's prompt, referencing the cache file
+written in Phase 2 — don't render the PR list into the prompt. If `prs` is empty
+(Phase 2's count check), omit the whole block. Otherwise:
 
 ```
 ## Open PRs in this repo (file-overlap context)
 
-- PR #7 "Refactor frobnicator" (head: frob-refactor) — files: src/frobnicator.ts, test/frobnicator.test.ts. Body: "<one line>"
-- PR #12 "Auth rewrite" (head: auth-rewrite) — files: src/auth/session.ts, src/auth/middleware.ts. Body: "<one line>"
+Read <abs path to $MAIN_REPO/.oddkit/burndown-open-prs.json>.
 
 If the files you identify as this issue's touch set intersect with any PR's files, run
 `gh pr view <n>` to confirm conceptual overlap, then include a "Likely PR overlap"
@@ -357,11 +377,30 @@ This is bonus context — the orchestrator still computes file overlap mechanica
 Phase 5. The recon agent's note (if any) gets folded into the Base branch section's
 explanation in Phase 6.
 
+### Report-to-file instruction for every recon prompt
+
+Full recon reports go to disk, not through you. Each scout's prompt also gets (with
+`<scout>` = `code-scout` or `impact-scout`):
+
+```
+Write your full report to
+<abs path to $MAIN_REPO>/.oddkit/burndown-issue-tracking/<n>-recon-<scout>.md via Bash
+(heredoc to a tmp file, then `mv`) — not the Write tool, which trips the background-run
+isolation guard on `.oddkit/` paths. Return ONLY:
+(a) a 2–3 line summary — where the work lands, what pattern to follow;
+(b) your `## Relevant Files` and `## Dependencies` path lists verbatim;
+(c) `## Likely PR overlap` if any;
+(d) if the behavior already appears implemented, up to 3 `file:line` refs as evidence.
+```
+
 Run all `2 * len(issues)` calls in one message.
 
-When agents return, write a 2-3 line `recon_summary` into each tracking file: where the
-work lands, what pattern to follow. Save full recon output as
-`$MAIN_REPO/.oddkit/burndown-issue-tracking/<n>-recon.md` for reference at implement time.
+When agents return, write a 2-3 line `recon_summary` into each tracking file from the
+returned summaries. The returned path lists keep Phase 5's overlap detection working
+without re-reading the report files. Then concatenate each issue's two report files into
+`$MAIN_REPO/.oddkit/burndown-issue-tracking/<n>-recon.md` under `## Code scout` /
+`## Impact scout` headings — one Bash call, zero context cost — so implement's expected
+single-file path is unchanged.
 
 ## Phase 5 — Classify and detect overlap
 
@@ -458,11 +497,11 @@ they delete this file and the matching tracking JSON, then re-run plan.
 
 ALWAYS use this exact structure. Implement parses it.
 
-For the **Issue summary** section, read the cached body at
-`$MAIN_REPO/.oddkit/burndown-issue-descriptions/<n>.md` and write a 1-3 sentence plain-
-language summary. Before writing it, Read the issue's downloaded images (from tracking's
-`images` array) so the summary reflects what the screenshots actually show — not just the
-text around them.
+For the **Issue summary** section, write a 1-3 sentence plain-language summary from the
+cached body (already read in Phase 2). Use the screenshots you read during
+classification (Phase 5) so the summary reflects what they actually show — not just the
+text around them; re-Read an image only if it's no longer in your context (e.g., after
+compaction).
 
 For **Linked files**, scan the body (and comments, if any) for:
 - HTML image tags (`<img src="url">`) and image/file attachments

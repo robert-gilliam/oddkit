@@ -119,36 +119,47 @@ mkdir -p "$STATE_DIR"
 ```
 
 For each PR in the final cohort, fetch the diff and file list. These are the only inputs
-the triage agent needs — no worktree, no codebase traversal:
+the triage agent needs — no worktree, no codebase traversal. Write the diff straight to
+disk so it never enters your context — the agent Reads it from the file:
 
 ```bash
-gh pr diff <n>              # full unified diff
-gh pr diff <n> --name-only  # file list
-gh pr view <n> --json number,title,body,additions,deletions,changedFiles,headRefOid
+gh pr diff <n> > "$STATE_DIR/diff-<n>.txt"   # full unified diff, direct to disk
+gh pr diff <n> --name-only                   # file list
+gh pr view <n> --json body,additions,deletions,changedFiles,headRefOid
 ```
 
+(`number` and `title` are already in hand from Phase 1 — don't re-fetch them.)
+
 Store per PR:
-- `pr.number`, `pr.title`, `pr.body` (may be empty)
-- `pr.diff` (full text)
+- `pr.number`, `pr.title` (from Phase 1), `pr.body` (may be empty)
+- `pr.diff_file` (absolute path to `$STATE_DIR/diff-<n>.txt`)
 - `pr.files` (list of paths)
 - `pr.additions`, `pr.deletions`, `pr.changed_files`
 - `pr.head_sha`
+
+Diff files stay in `$STATE_DIR` alongside the state JSONs — a re-run after a parse error
+skips nothing it shouldn't, and each run overwrites them anyway.
 
 ### Intent baseline (linked issue)
 
 If the PR body references an issue (`Closes #<n>`, `Fixes #<n>`, `Resolves #<n>`) and a
 cached issue description exists at `.oddkit/burndown-issue-descriptions/<n>.md`
-(burndown PRs always have both), read it and store it as `pr.issue_body`. Grading the
+(burndown PRs always have both), store its absolute path as `pr.issue_body_file` — the
+triage agent Reads it directly; don't paste the body into the prompt. Grading the
 diff against the PR description alone has a blind spot for agent-authored PRs: the same
 agent wrote both, so intent=✓ only measures self-consistency. The issue says what was
 actually asked for — that's the baseline that matters.
 
 ### Size cap
 
-If a single PR's diff exceeds 3000 lines, **do not send the full diff to the agent**.
-Instead, pre-compute:
+Check size with `wc -l < "$STATE_DIR/diff-<n>.txt"`. If a single PR's diff exceeds 3000
+lines, **do not point the agent at the full diff file**. Instead, pre-compute:
 - Scope grade: `L` (large diffs are always L)
-- A truncated input: file list + the first 30 lines of each file's hunk
+- A truncated diff file — file list + the first 30 lines of each file's hunk:
+  ```bash
+  awk '/^diff --git/{n=0} n++<30' "$STATE_DIR/diff-<n>.txt" > "$STATE_DIR/diff-<n>-truncated.txt"
+  ```
+  Pass this path in the prompt instead of the full diff's.
 - A note: `oversized: true`
 
 The agent still grades intent and smell on the truncated sample, but the comment will
@@ -160,9 +171,10 @@ read of the full change."
 For every PR in the cohort, dispatch the Agent tool with `model: sonnet` and the prompt
 below. Send all calls in one message so they run concurrently.
 
-Each agent's task is narrow: read the diff text, emit a structured verdict. No file
-reads. No greps. No web fetches. It has the PR description and the diff — that's the
-whole world for this call.
+Each agent's task is narrow: Read the diff file, emit a structured verdict. Its only
+file reads are the files the prompt names — the diff file, plus the linked-issue file
+when one exists. No other reads, no greps, no web fetches. It has the PR description
+and the diff — that's the whole world for this call.
 
 ### Triage agent prompt
 
@@ -180,20 +192,23 @@ review. Spend your tokens on judgment, not exploration.
 ## PR description
 {body, or "(no description)"}
 
-{If pr.issue_body exists:}
+{If pr.issue_body_file exists:}
 ## Linked issue (intent baseline)
 The PR closes this issue. Grade Intent against what the issue asks for, not just the
 PR description — the description was written by the same author as the diff.
-{issue body}
+Read the issue at: {abs path from pr.issue_body_file}
 {Omit this section entirely when there is no cached issue.}
 
 ## Files changed
 {file list, one per line}
 
 ## Diff
-```
-{unified diff, or the truncated sample if oversized}
-```
+Read the full unified diff at: {abs path from pr.diff_file, or the truncated file if
+oversized}
+Read this file first. It is your only code input.
+
+Your only file reads are the files named above — the diff file, and the linked-issue
+file if present. No other reads, greps, or web fetches.
 
 ## Your job
 
@@ -428,7 +443,7 @@ No worktree cleanup needed — this skill creates none.
 
 ## Notes for the implementer
 
-- **No worktrees, no codebase reads.** Triage agents work from diff text only. The whole
+- **No worktrees, no codebase reads.** Triage agents work from the diff file only. The whole
   point is to be cheap. If you find yourself wanting to grep the codebase, you're doing
   review work, not vet work — escalate to `/oddkit:review`.
 - **One agent per PR, all in one Agent-tool message.** Sequential dispatch loses the
