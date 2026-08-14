@@ -35,6 +35,7 @@ claude plugin install oddkit@oddkit
 | `implement` | Execute a plan phase by phase with compliance checks and verification. |
 | `burndown-plan` + `burndown-implement` | Burn down a batch of GitHub issues. `plan` recons in parallel and writes clarifying-question files; answer them offline, then `implement` ships one worktree + one PR per issue. |
 | `burndown-ship` | Fully autonomous burndown pipeline: implement → vet → route per PR (clean = done, iffy = address feedback, red = review + address feedback). One command, walk away. Resumable. |
+| `one-shot` | Carry a single task from a bare description to a merge-ready (or merged) PR: recon, plan, TDD implement, PR, CI green. Optional issue creation, review-and-fix, and merge. |
 | `skill-converter` | Import an external skill and rewrite it as an oddkit skill (minimal, concise, no ceremony or AI fluff). |
 | `update` | Pull the latest oddkit from GitHub and refresh the local cache. |
 
@@ -95,6 +96,24 @@ claude plugin install oddkit@oddkit
 
 ```
 /oddkit:burndown-ship
+```
+
+**`one-shot`** — One task, end to end, in a single autonomous run: optional issue → recon → plan → implement with TDD → PR → optional review-and-fix → CI green → optional merge. It asks nothing unless it hits a real emergency (breaking regressions, an XL refactor, or work that runs against the app's intent).
+
+| Argument | What it does | Default |
+|----------|-------------|---------|
+| `[task description]` | Free text, or `#N` / an issue URL to use an existing issue as the spec. Required. | — |
+| `--create-issue` | Opens a GitHub issue first and uses it as the spec. Uses a project-local `create-issue` skill if one exists. | off |
+| `--with-review` | Runs `/oddkit:review-and-fix` on the PR before the CI gate. | off |
+| `--yolo` | Squash-merges the PR once CI is green and deletes the branch. | off |
+
+Each flag is also inferred from the description, so plain language works: "open an issue for this" turns on `--create-issue`, "review it" turns on `--with-review`, "ship it" or "merge it" turns on `--yolo`. The base branch is detected from `origin/HEAD`.
+
+```
+/oddkit:one-shot fix the flaky retry logic in the sync worker
+/oddkit:one-shot #42 --with-review
+/oddkit:one-shot add a --json flag to the CLI --create-issue --with-review --yolo
+/oddkit:one-shot build the CSV export and merge it once CI is green
 ```
 
 **`skill-converter`** — Convert external skills into oddkit skills. Analyzes methodology, asks just enough to gauge intent, produces a compact skill.
