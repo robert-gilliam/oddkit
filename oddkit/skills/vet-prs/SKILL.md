@@ -168,6 +168,25 @@ read of the full change."
 
 ## Phase 4 — Spawn one triage agent per PR in parallel
 
+### Workflow path (preferred)
+
+If the Workflow tool is in your tool list, use it instead of hand-dispatching agents —
+the script pins `model: sonnet`, runs every PR concurrently, and returns schema-validated
+verdicts, so none of that depends on you remembering it. Invoke:
+
+- `scriptPath`: `${CLAUDE_SKILL_DIR}/scripts/triage.workflow.js`
+- `args`: `{ "prs": [...] }` — one entry per cohort PR with the fields from Phase 3:
+  `number`, `title`, `author`, `base_ref`, `additions`, `deletions`, `changed_files`,
+  `body`, `files`, `diff_file` (the truncated file for oversized PRs), `oversized`,
+  and `issue_body_file` when one exists.
+
+The result is one verdict object per PR (`scope`, `intent`, `smell`, the three notes,
+`concerns`, `parse_error`). Write each to `$STATE_DIR/<n>.json` in the shape below,
+stamping `vetted_at` yourself — workflow scripts can't read the clock. Then skip the
+rest of this phase and go to Phase 5.
+
+### Manual path (Workflow tool unavailable)
+
 For every PR in the cohort, dispatch the Agent tool with `model: sonnet` and the prompt
 below. Send all calls in one message so they run concurrently.
 
@@ -446,6 +465,8 @@ No worktree cleanup needed — this skill creates none.
 - **No worktrees, no codebase reads.** Triage agents work from the diff file only. The whole
   point is to be cheap. If you find yourself wanting to grep the codebase, you're doing
   review work, not vet work — escalate to `/oddkit:review`.
+- **Prefer the workflow path.** The script makes the next two bullets structural
+  instead of instructions to remember; they only bind on the manual path.
 - **One agent per PR, all in one Agent-tool message.** Sequential dispatch loses the
   whole parallelism win.
 - **`model: sonnet` on every Agent call.** Don't let it default to opus.

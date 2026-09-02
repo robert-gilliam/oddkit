@@ -116,6 +116,27 @@ Determine content type from the changed file list (`PR_FILES` for GitHub reviews
 
 If mixed, treat as code review (code agents catch what matters most).
 
+### Workflow path (preferred)
+
+If the Workflow tool is in your tool list, use it instead of spawning agents by hand.
+The script runs the right agents for the content type, dedupes exact-duplicate findings,
+and verifies every survivor with a throwaway sonnet agent — so the file reads that
+verification needs never land in your context. Invoke:
+
+- `scriptPath`: `${CLAUDE_SKILL_DIR}/scripts/review.workflow.js`
+- `args`: `mode` (`"code"` or `"plan"` from the detection above), plus whichever of
+  these this review has: `diff_file` (abs `DIFF_FILE`), `file_path` (abs `FILE_PATH`,
+  no-diff mode), `review_root` (abs `REVIEW_ROOT`, GitHub reviews), `pr_files`
+  (`PR_FILES` array, GitHub reviews), `pr_body` (`PR_BODY`).
+
+The result is `{ findings, discarded }` — already deduplicated and verified, each
+finding carrying `severity`, `line`, and the `agents` that flagged it. Skip the manual
+spawn below and Steps 3a–3b; resume at Step 3c with these findings.
+
+### Manual path (Workflow tool unavailable)
+
+Spawn the agents yourself as described below, then run all of Step 3.
+
 ### Code review → 3 agents in parallel
 
 Spawn `@oddkit:correctness`, `@oddkit:intent-checker`, `@oddkit:design-critic` using the Agent tool.
@@ -161,6 +182,8 @@ For fact-checker, also read full file contents (not just diff hunks) so it can v
 Each agent must quote exact text from the plan for every finding.
 
 ## Step 3 — Collect, deduplicate, verify
+
+Workflow path: findings arrive deduplicated and verified — skip 3a and 3b, start at 3c.
 
 ### 3a. Parse and deduplicate
 
