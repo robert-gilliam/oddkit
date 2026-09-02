@@ -86,21 +86,25 @@ The PR exists to satisfy something. Find what:
 Create one worktree for the whole skill — agents read code at the right SHA, fixes get committed in isolation.
 
 ```bash
-mkdir -p .oddkit/worktrees
+mkdir -p .claude/worktrees
 ```
+
+Code worktrees live under `.claude/worktrees/` — the harness only lets an agent enter and
+write in worktrees there, so one under `.oddkit/` blocks every edit until it's relocated.
+Durable `.oddkit/` state is unaffected.
 
 **PR mode**: worktree on the PR's head branch (we'll commit fixes onto it).
 
 ```bash
 git fetch origin <HEAD_BRANCH>
-git worktree add .oddkit/worktrees/review-and-fix-<timestamp> origin/<HEAD_BRANCH>
+git worktree add .claude/worktrees/review-and-fix-<timestamp> origin/<HEAD_BRANCH>
 ```
 
 **Local mode**: worktree at the current HEAD (we'll commit fixes onto the current branch).
 
 ```bash
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-git worktree add .oddkit/worktrees/review-and-fix-<timestamp> "$CURRENT_BRANCH"
+git worktree add .claude/worktrees/review-and-fix-<timestamp> "$CURRENT_BRANCH"
 ```
 
 Store the worktree path as `WORK_DIR`. **All** subsequent file reads, code searches, and edits use `WORK_DIR`.
