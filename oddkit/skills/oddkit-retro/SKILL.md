@@ -68,11 +68,12 @@ Work on a worktree of the oddkit repo. Never edit on the developer's current bra
 ```bash
 ODDKIT=~/Development/oddkit
 git -C "$ODDKIT" fetch origin main
-WT="$ODDKIT/.oddkit/worktrees/oddkit-retro"   # append -2, -3 if the path exists
+WT="$ODDKIT/.claude/worktrees/oddkit-retro"   # append -2, -3 if the path exists
 git -C "$ODDKIT" worktree add "$WT" -b retro/<short-slug> origin/main
 ```
 
-`.oddkit/` is gitignored, so the worktree never pollutes the repo — that is why it lives there. Apply the approved edits inside `$WT` with `git -C "$WT"` or by pathing into it; keep each diff minimal. Commit with the co-author trailer, push, and open the PR against `main`:
+`.claude/worktrees/` is gitignored too, so the worktree never pollutes the repo — and unlike
+`.oddkit/`, the harness will let you enter and edit inside it. Apply the approved edits inside `$WT` with `git -C "$WT"` or by pathing into it; keep each diff minimal. Commit with the co-author trailer, push, and open the PR against `main`:
 
 ```
 git -C "$WT" add -A

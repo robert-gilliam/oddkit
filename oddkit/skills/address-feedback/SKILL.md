@@ -40,10 +40,14 @@ Verify local branch is up-to-date with origin. If not, stop: "Local branch is no
 If the working tree is clean (`git status --porcelain` is empty) and you're already on `HEAD_BRANCH`, use the current directory. Otherwise create a worktree checked out on `HEAD_BRANCH` — never a new branch off main:
 
 ```bash
-mkdir -p .oddkit/worktrees
+mkdir -p .claude/worktrees
 git fetch origin <HEAD_BRANCH>
-git worktree add .oddkit/worktrees/addr-feedback-<timestamp> origin/<HEAD_BRANCH>
+git worktree add .claude/worktrees/addr-feedback-<timestamp> origin/<HEAD_BRANCH>
 ```
+
+Code worktrees live under `.claude/worktrees/` — the harness only lets an agent enter and
+write in worktrees there, so one under `.oddkit/` blocks every edit until it's relocated.
+Durable `.oddkit/` state is unaffected.
 
 Fetch the base branch for comparison.
 
