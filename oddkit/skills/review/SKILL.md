@@ -98,23 +98,20 @@ If the diff exceeds 5,000 lines (`wc -l < "$DIFF_FILE"`), warn and ask to confir
 
 ## Step 2 — Detect content type and spawn agents
 
-### If file path (no diff)
+### Detect content type
 
-Determine content type from the file extension:
+**If file path (no diff)** — from the file extension:
 - **Code** (.ts, .js, .py, .go, .rs, etc.) → code review agents
 - **Plan/docs** (.md, .txt) → plan review agents
 
-Pass `FILE_CONTENT` to the agents instead of a diff. Skip to Step 3.
-
-### If diff
-
-Determine content type from the changed file list (`PR_FILES` for GitHub reviews, the
-`--stat` output for local ones) — no need to read the diff itself:
-
+**If diff** — from the changed file list (`PR_FILES` for GitHub reviews, the `--stat`
+output for local ones), no need to read the diff itself:
 - **Code**: diff contains source files (.ts, .js, .py, .go, .rs, etc.)
 - **Plan/docs**: diff contains only markdown, text, or documentation files
 
 If mixed, treat as code review (code agents catch what matters most).
+
+Then pick a path below. Both handle either case.
 
 ### Workflow path (preferred)
 
@@ -129,13 +126,24 @@ verification needs never land in your context. Invoke:
   no-diff mode), `review_root` (abs `REVIEW_ROOT`, GitHub reviews), `pr_files`
   (`PR_FILES` array, GitHub reviews), `pr_body` (`PR_BODY`).
 
-The result is `{ findings, discarded }` — already deduplicated and verified, each
-finding carrying `severity`, `line`, and the `agents` that flagged it. Skip the manual
-spawn below and Steps 3a–3b; resume at Step 3c with these findings.
+The result is `{ findings, discarded, unverified, agents_failed }`. Findings arrive
+deduplicated and verified, each carrying `severity`, `why`, `line`, and the `agents`
+that flagged it. Three things the caller must honor:
+
+- **`line: 0` means no diff anchor** (a finding about absent code, or a file-level
+  claim). Post those in the review body — GitHub rejects line 0 with a 422 after the
+  pending review is already open, and the `gh` fallback builds a broken `#L0` link.
+- **`agents_failed`** names reviewers that died. A whole perspective is missing, so
+  report it and apply the 3d rule below.
+- **`unverified`** counts findings no verifier reached. These are coverage gaps, not
+  discards — never fold them into the "removed during verification" count.
+
+Skip the manual spawn below and Steps 3a–3b; resume at Step 3c with these findings.
 
 ### Manual path (Workflow tool unavailable)
 
-Spawn the agents yourself as described below, then run all of Step 3.
+Spawn the agents yourself as described below, then run all of Step 3. For a single-file
+review, pass `FILE_CONTENT` to the agents instead of a diff.
 
 ### Code review → 3 agents in parallel
 
@@ -233,6 +241,11 @@ Pick one verdict from the findings:
 - **Fix then merge** — blocking issues are small, localized fixes
 - **Needs reworking** — blocking issues require structural or design changes
 
+**Never say "Ready to merge" on an incomplete pass.** If any reviewer died
+(`agents_failed`) or any finding went unverified (`unverified`), the review didn't
+cover what it claims to. Use "Fix then merge" at most, and name the gap in the review
+body: "review incomplete — {agent} failed" / "{n} finding(s) unverified".
+
 Store as `VERDICT`. Map to the GitHub review event:
 - Ready to merge / Fix then merge → `"APPROVE"`
 - Needs reworking → `"COMMENT"`
@@ -281,8 +294,11 @@ Print to terminal. For file reviews, replace `{DIFF_STAT}` with `Reviewing: {FIL
 
 ---
 
-*{count} finding(s) removed during verification.*
+*{discarded} finding(s) removed during verification.*
+{If agents_failed or unverified: *Review incomplete: {agents_failed} agent(s) failed, {unverified} finding(s) unverified.*}
 ```
+
+Findings with `line: 0` print under their file as `**{file}** — (no line anchor)`.
 
 If no findings: "No issues found. All clear. **Recommendation:** {VERDICT}."
 
@@ -311,13 +327,19 @@ Call `mcp__plugin_github_github__pull_request_review_write` with:
 
 **2. Add inline comments to the pending review:**
 
-For each finding, call `mcp__plugin_github_github__add_comment_to_pending_review` with:
+For each finding with a real line number, call
+`mcp__plugin_github_github__add_comment_to_pending_review` with:
 - `owner`, `repo`, `pullNumber`
 - `path`: file path relative to repo root
 - `line`: the line number in the diff
 - `side`: `"RIGHT"`
 - `subjectType`: `"LINE"`
 - `body`: the comment (format below)
+
+**Findings with `line: 0` have no diff anchor** — code that is absent, or a claim about
+the change as a whole. Never pass 0 as `line`: GitHub 422s and the pending review is
+already open. Put them in the submit body instead, under an `**Unanchored findings**`
+heading, each naming its file when it has one.
 
 For multi-line comments, also pass `startLine` and `startSide: "RIGHT"`.
 
@@ -343,7 +365,9 @@ Call `mcp__plugin_github_github__pull_request_review_write` with:
 - `method`: `"submit_pending"`
 - `owner`: `OWNER`, `repo`: `REPO`, `pullNumber`: `PR_NUMBER`
 - `event`: `REVIEW_EVENT`
-- `body`: one sentence of praise naming the concrete thing that works (a clean abstraction, good test coverage, edge case handling), followed by `"Recommendation: {VERDICT}."`, followed by the stats line: `"Reviewed: {N} issue(s) — {B} blocking, {W} warnings. {count} finding(s) removed during verification."`
+- `body`: one sentence of praise naming the concrete thing that works (a clean abstraction, good test coverage, edge case handling), followed by `"Recommendation: {VERDICT}."`, followed by the stats line: `"Reviewed: {N} issue(s) — {B} blocking, {W} warnings. {discarded} finding(s) removed during verification."`
+  Append the coverage gaps when there are any — `"Review incomplete: {agents_failed} agent(s) failed, {unverified} finding(s) unverified."` A pass that ran two of three
+  agents must not read as a clean sweep.
 
 No generic "great work!" — name a specific thing.
 
@@ -373,8 +397,11 @@ Format with linked code references. Use full SHA links (`https://github.com/{OWN
 
 (repeat for each finding)
 
-*{count} removed during verification.*
+*{discarded} removed during verification.*
+{If agents_failed or unverified: *Review incomplete: {agents_failed} agent(s) failed, {unverified} finding(s) unverified.*}
 ```
+
+Findings with `line: 0` get no `#L` anchor — link the file alone.
 
 Report: issues found, discarded count, PR link.
 
