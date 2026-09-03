@@ -128,10 +128,10 @@ gh pr diff <n> --name-only                   # file list
 gh pr view <n> --json body,additions,deletions,changedFiles,headRefOid
 ```
 
-(`number` and `title` are already in hand from Phase 1 — don't re-fetch them.)
+(`number`, `title`, and `url` are already in hand from Phase 1 — don't re-fetch them.)
 
 Store per PR:
-- `pr.number`, `pr.title` (from Phase 1), `pr.body` (may be empty)
+- `pr.number`, `pr.title`, `pr.url` (all from Phase 1), `pr.body` (may be empty)
 - `pr.diff_file` (absolute path to `$STATE_DIR/diff-<n>.txt`)
 - `pr.files` (list of paths)
 - `pr.additions`, `pr.deletions`, `pr.changed_files`
@@ -168,6 +168,35 @@ read of the full change."
 
 ## Phase 4 — Spawn one triage agent per PR in parallel
 
+### Per-PR state (both paths)
+
+Write per-PR state to `$STATE_DIR/<n>.json`:
+
+```json
+{
+  "pr_number": 14,
+  "title": "Auth refactor",
+  "url": "https://github.com/owner/repo/pull/14",
+  "head_sha": "abc123...",
+  "scope": "M",
+  "intent": "⚠️",
+  "smell": "clean",
+  "scope_note": "...",
+  "intent_note": "...",
+  "smell_note": "...",
+  "concerns": ["..."],
+  "oversized": false,
+  "parse_error": false,
+  "vetted_at": "<iso utc>"
+}
+```
+
+Atomic write (`mv tmp final`) — interrupted runs shouldn't leave half-written JSON.
+
+Three fields never come from the agent — fill them in yourself from what Phase 3
+already holds: `url`, `head_sha`, and `vetted_at` (ISO UTC; workflow scripts can't
+read the clock).
+
 ### Workflow path (preferred)
 
 If the Workflow tool is in your tool list, use it instead of hand-dispatching agents —
@@ -181,9 +210,10 @@ verdicts, so none of that depends on you remembering it. Invoke:
   and `issue_body_file` when one exists.
 
 The result is one verdict object per PR (`scope`, `intent`, `smell`, the three notes,
-`concerns`, `parse_error`). Write each to `$STATE_DIR/<n>.json` in the shape below,
-stamping `vetted_at` yourself — workflow scripts can't read the clock. Then skip the
-rest of this phase and go to Phase 5.
+`concerns`, `parse_error`). `intent` comes back as `✓`/`⚠️`/`✗` — the script grades in
+ASCII internally and renders the symbols on return, so state files and downstream
+routing are unchanged. Write each to `$STATE_DIR/<n>.json` in the shape above, adding
+the three caller-stamped fields. Then skip the rest of this phase and go to Phase 5.
 
 ### Manual path (Workflow tool unavailable)
 
@@ -285,28 +315,8 @@ When each agent returns, parse the structured block. If parsing fails for any PR
 agent went off-script), record `parse_error: true` for that PR — the report calls it out
 and it won't get a comment posted.
 
-Write per-PR state to `$STATE_DIR/<n>.json`:
-
-```json
-{
-  "pr_number": 14,
-  "title": "Auth refactor",
-  "url": "https://github.com/owner/repo/pull/14",
-  "head_sha": "abc123...",
-  "scope": "M",
-  "intent": "⚠️",
-  "smell": "clean",
-  "scope_note": "...",
-  "intent_note": "...",
-  "smell_note": "...",
-  "concerns": ["..."],
-  "oversized": false,
-  "parse_error": false,
-  "vetted_at": "<iso utc>"
-}
-```
-
-Atomic write (`mv tmp final`) — interrupted runs shouldn't leave half-written JSON.
+Write state in the shape given at the top of this phase, including the three
+caller-stamped fields.
 
 ## Phase 5 — Build the report
 
