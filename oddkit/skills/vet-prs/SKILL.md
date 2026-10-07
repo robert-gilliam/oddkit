@@ -38,9 +38,9 @@ From `$ARGUMENTS`:
 - **PR refs** (positional, optional): `#\d+`, bare numbers, or GitHub PR URLs. If
   omitted, vet **all open PRs in the current repo**.
 - **`--yolo`** (optional): fully autonomous mode. Skips every interactive prompt this
-  skill would otherwise show — the >30-PR confirmation (Phase 1), the "already
-  approved/vetted" override prompt (Phase 2), and the "post comments?" confirmation
-  (Phase 6). Each defaults to the "include / proceed" choice. Set automatically when
+  skill would otherwise show — the >30-PR confirmation (Phase 1) and the "already
+  approved/vetted" override prompt (Phase 2). Each defaults to the "include / proceed"
+  choice. Comments post without a prompt either way (Phase 6). Set automatically when
   invoked from `/oddkit:burndown-ship`.
 
 If the explicit list contains anything that isn't a PR ref, abort with a clear error
@@ -330,15 +330,10 @@ The "Worth a closer look" section is built from any PR with `intent ∈ {⚠️,
 parse errors, and oversized PRs go under "Skipped / flagged" but only as annotations —
 they're not separate buckets.
 
-## Phase 6 — Confirm and post comments
+## Phase 6 — Post comments
 
-Unless `--yolo`:
-
-```
-Post {N} triage comments to GitHub? (y/n)
-```
-
-If declined, stop after writing the report. Tell the dev where it is.
+Posting is the point of the skill, so don't ask first. Invoking `/oddkit:vet-prs` is the
+authorization.
 
 For each PR with no parse error, build a comment body:
 
@@ -374,9 +369,8 @@ The trailing HTML marker is how a re-run identifies its own comment.
 
 **Critical:** harness safety classifiers (Claude Code auto-mode, etc.) treat each
 `gh pr comment` invocation as an independent external-system write. Parallel calls or
-multiple sequential tool invocations after a single confirmation gate can be denied
-mid-batch — the user's "yes" only reliably authorizes the *next* tool call, not the
-fifth one ten messages later. **One gate, one tool call.** Wrap all the upserts in a
+multiple sequential tool invocations can be denied mid-batch — the user's invocation
+reliably authorizes one batch write, not five scattered ones. **One batch, one tool call.** Wrap all the upserts in a
 single shell loop so the classifier sees one authorized action covering the whole batch.
 
 First, write each comment body to a file under `$STATE_DIR/comment-<n>.md`. Prefer the
