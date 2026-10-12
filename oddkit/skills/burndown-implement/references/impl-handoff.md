@@ -35,7 +35,7 @@ separate calls or `git -C <path>`.
 - Plan: `[<main-repo>/.oddkit/burndown-plans/<n>.plan.md]` or `null` (simple issues — implement from issue + recon + clarifications)
 - Base branch: `[main | <predecessor branch>]`
 - Per-issue worktree to create: `[<main-repo>/.claude/worktrees/burndown-issue-<n>]`
-- Branch to create: `[burndown/issue-<n>-<slug>]`
+- Branch to create: `[<type>/<n>-<slug>]`
 
 ## State updates
 

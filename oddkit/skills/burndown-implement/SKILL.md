@@ -190,7 +190,9 @@ edit without tripping the harness's permission-root relocation prompt — that g
 only for worktrees outside `.claude/worktrees/`, and `bypassPermissions` doesn't suppress
 it. Durable burndown state stays in `.oddkit/`; only the ephemeral code checkout moves.
 
-Branch name: `burndown/issue-<n>-<slug>`. Branch off `origin/<base_branch>` (from
+Branch name: `<type>/<n>-<slug>`, where `<type>` is the conventional-commit type the
+change will carry (`feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `chore`), read from
+the issue. Branch off `origin/<base_branch>` (from
 tracking), except in serialized chains where it's the predecessor's branch.
 
 ### Spawning impl agents
