@@ -27,7 +27,7 @@ calls or `git -C <path>`.
 - Base branch: `[<BASE_BRANCH>]`
 - Closes issue: `[#<n>]` or "none"
 - Worktree to create: `[<main-repo>/.claude/worktrees/one-shot-impl]`
-- Branch to create: `[one-shot/<short-slug>]`
+- Branch to create: `[<type>/<n>-<short-slug>]` (`<type>` = conventional-commit type: `feat`, `fix`, `refactor`, …; drop `<n>-` when no issue)
 
 ## Steps
 
