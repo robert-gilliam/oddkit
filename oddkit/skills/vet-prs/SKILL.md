@@ -142,13 +142,33 @@ skips nothing it shouldn't, and each run overwrites them anyway.
 
 ### Intent baseline (linked issue)
 
-If the PR body references an issue (`Closes #<n>`, `Fixes #<n>`, `Resolves #<n>`) and a
-cached issue description exists at `.oddkit/burndown-issue-descriptions/<n>.md`
-(burndown PRs always have both), store its absolute path as `pr.issue_body_file` — the
-triage agent Reads it directly; don't paste the body into the prompt. Grading the
-diff against the PR description alone has a blind spot for agent-authored PRs: the same
-agent wrote both, so intent=✓ only measures self-consistency. The issue says what was
-actually asked for — that's the baseline that matters.
+If the PR body references an issue (`Closes #<n>`, `Fixes #<n>`, `Resolves #<n>`), store
+the absolute path of `.oddkit/burndown-issue-descriptions/<n>.md` as
+`pr.issue_body_file` — the triage agent Reads it directly; don't paste the body into the
+prompt. Grading the diff against the PR description alone has a blind spot for
+agent-authored PRs: the same agent wrote both, so intent=✓ only measures
+self-consistency. The issue says what was actually asked for — that's the baseline that
+matters.
+
+Burndown PRs already have the cache. For any other PR (one-shot, autopilot, a human's),
+build it now in the same shape, comments included, so a brief or decisions posted on the
+thread count as part of the ask:
+
+```bash
+DESC_DIR="$MAIN_REPO/.oddkit/burndown-issue-descriptions"; mkdir -p "$DESC_DIR"
+[ -f "$DESC_DIR/<n>.md" ] || {
+  TMP="$DESC_DIR/<n>.json.tmp"
+  gh issue view <n> --json number,title,body,labels,assignees,url,state,comments > "$TMP"
+  jq -r '"# \(.title)\n\n- URL: \(.url)\n- State: \(.state)\n- Labels: \([.labels[].name] | join(", "))\n- Assignees: \([.assignees[].login] | join(", "))\n\n\(.body)"
+    + (if (.comments | length) > 0
+       then "\n\n## Comments\n\n" + ([.comments[] | "### \(.author.login) — \(.createdAt)\n\n\(.body)"] | join("\n\n"))
+       else "" end)' "$TMP" > "$DESC_DIR/<n>.md"
+  rm -f "$TMP"
+}
+```
+
+If the fetch fails (issue in another repo, no access), drop `pr.issue_body_file` and
+grade against the PR description as before.
 
 ### Size cap
 

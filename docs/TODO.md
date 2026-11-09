@@ -64,6 +64,8 @@ Planned skills (not yet built):
 - [ ] `polish` — run `review` on the current (or specified) branch, fix blocking issues, repeat until clean, then run linting/tests/CI and fix failures until everything passes
 - [x] `burndown-plan` + `burndown-implement` — multi-agent orchestration over a list of GitHub issues, async-split. plan recons, classifies, and writes per-issue clarifying-question files. implement scans tracking files and ships PRs unattended (one worktree per issue, one PR per issue). Auto-serializes file-overlapping issues into stacked PRs. Fully resumable. Replaces the original interactive `burndown`.
 - [x] `vet-prs` — fast parallel triage gate for a batch of open PRs. One Sonnet agent per PR grades scope, intent, and smell. Posts an upsertable comment on each PR. Use before sinking tokens into `/oddkit:review` on a pile.
+- [x] `autopilot` — resolve GitHub issues with no human in the loop. Thin orchestrator over one-shot, vet-prs, review-and-fix (and burndown-plan for the rare needs-human case). Adds a triage gate with the three-part needs-human test, a vet gate, and a stop protocol that comments instead of asking. Single or batch; batch fans out per issue and serializes merges.
+- [ ] `autopilot` — full-pipeline eval on a sandbox repo (iteration 1 covered triage only, on fixtures)
 
 ## 8. Future-Proofing
 
