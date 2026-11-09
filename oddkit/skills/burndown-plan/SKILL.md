@@ -464,15 +464,32 @@ question. The developer fills them in offline.
 
 ### Decide whether an issue needs a clarifications file
 
-Write one when **any** of these is true:
-- Ambiguous business logic
-- Branching design (pattern A vs B, both plausible)
-- Scope uncertainty (does X include Y?)
-- Unresolved edge cases
-- `pr_suggestion != null` (recon detected open-PR overlap — surface the stacking choice)
+A question earns a place in the file only when the developer genuinely has to make the
+call. Past runs asked about things that didn't matter (a default value, which of two
+equivalent patterns), and every needless question is a file the developer has to open
+before anything ships. So apply the **needs-human test**: write a question only when a
+decision is **all three** of:
 
-Skip when recon + issue body fully define the work *and* there's no PR overlap to
-surface. Sharper questions beat blanket coverage.
+1. **Visible outside the code** — behavior, data, a contract, money, permissions,
+   deletion. Internal choices (naming, file placement, equivalent patterns, test layout,
+   an easily changed default) never qualify.
+2. **Without precedent** — nothing in the thread, codebase, tests, docs, or conventions
+   tips it. A sibling feature that already made the choice is precedent: follow it.
+3. **Expensive to reverse** — a migration, a public API, an external integration,
+   destroyed data, or behavior a user would report as a bug rather than missing polish.
+
+Decisions that fail the test are the impl agent's to make; note them in `recon_summary`
+so the agent sees your lean, and the PR body will list the call. Also write a file when
+`pr_suggestion != null` (recon detected open-PR overlap — the stacking choice is the
+developer's).
+
+Examples: "hard- or soft-delete, no delete pattern anywhere" → ask. "Default date
+range, none stated" → don't ask; pick one. "Author wants a modal, a teammate says page,
+codebase does pages everywhere" → don't ask; follow precedent and say so. Same
+disagreement with both patterns in the codebase → ask.
+
+Skip the file when no decision passes the test *and* there's no PR overlap to surface.
+Sharper questions beat blanket coverage.
 
 `already_done` issues: no clarifications file regardless of PR overlap. The evidence is
 in the tracking file and the handoff summary; the developer can sanity-check before

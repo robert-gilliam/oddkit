@@ -12,7 +12,7 @@ description: >
   "take this all the way to a PR", "build and ship X", "just do it and merge", or
   "/oddkit:one-shot". Pick this for a single task; pick /oddkit:burndown-ship for a batch
   of pre-planned issues.
-argument-hint: "[task description] [--create-issue] [--with-review] [--yolo]"
+argument-hint: "[task description] [--create-issue] [--with-review] [--yolo] [--unattended]"
 model: opus
 ---
 
@@ -61,6 +61,11 @@ it:
 | `CREATE_ISSUE`  | `--create-issue` | "open/file/create an issue for…", "track this as an issue first"   | off     |
 | `WITH_REVIEW`   | `--with-review`  | "review it", "make it solid", "vet the change", "review and fix"   | off     |
 | `MERGE`         | `--yolo`         | "merge it", "ship it", "all the way", "yolo", "take it to merge"   | off     |
+| `UNATTENDED`    | `--unattended`   | flag only; set by `/oddkit:autopilot` and scheduled runs           | off     |
+
+`UNATTENDED` changes one thing: an emergency posts a comment on the issue and stops
+instead of asking in the terminal (see **Emergency protocol**). Nobody is watching an
+unattended run, so a question would hang forever; a comment gets read later.
 
 The defaults are deliberately safe: with no signal, one-shot opens a PR and drives CI green
 but does **not** create an issue or merge. Those are the only irreversible-ish actions, so
@@ -165,8 +170,19 @@ emergency; that's just the work.
 For a complex task, spawn a plan-generation Agent (**`model: opus`** — the plan drives
 everything downstream). Give it the `ISSUE_SPEC` and the full recon output; have it return a
 concrete plan (overview, key decisions, risks, phased steps with file paths and how to
-verify each). Hold the returned plan text — you'll pass it to the implementer. Simple tasks
-skip planning and are implemented from spec + recon directly.
+verify each). Simple tasks skip planning and are implemented from spec + recon directly.
+
+**Review the plan before anyone codes from it.** A plan that cites a file that doesn't
+exist, or skips an acceptance criterion, costs far more to discover during
+implementation than now. Spawn `@oddkit:fact-checker`, `@oddkit:completeness-auditor`,
+and `@oddkit:design-critic` in one message, each with the plan text, the `ISSUE_SPEC`,
+and `RECON_WT` as `cwd`. fact-checker validates every path and claim against the code;
+completeness-auditor flags any spec requirement the plan doesn't cover; design-critic
+looks for a simpler approach. Verify their findings the way `oddkit:review` does (quote
+exists, issue is real, not already handled), then send the surviving findings back to
+the plan agent for **one** revision round. Hold the revised plan text — you'll pass it to
+the implementer. One round is the cap; a plan still contested after that is implemented
+as revised, with the open points listed in the PR body.
 
 Remove the recon worktree once recon and planning are done:
 
@@ -308,7 +324,14 @@ commits? worktree path?). Offer concrete options, e.g.:
 - **Narrow the scope** — ship a smaller, safe slice now (say exactly which), leave the rest.
 - **Stop here** — leave what exists (issue/worktree) for a human and abort.
 
-Then do what they choose. Emergencies should be rare — if you're invoking this more than
+Then do what they choose.
+
+**Under `UNATTENDED`**, don't ask. Post the same content as a comment on the issue
+(`gh issue comment <ISSUE_NUMBER> --body-file ...`; if there is no issue, print it) with
+the heading `## One-shot: stopped (emergency: <rabbit hole | XL refactor | against
+intent>)`, the three options as the "To resume" section, and the marker
+`<!-- oddkit:autopilot-stop -->` on the last line so the caller can find it. Then set the
+result to `Stopped (emergency)` and go to Phase 8. Leave the worktree in place. Emergencies should be rare — if you're invoking this more than
 once in a run, you're probably over-escalating; re-read the three definitions and default to
 proceeding.
 

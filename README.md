@@ -36,6 +36,7 @@ claude plugin install oddkit@oddkit
 | `burndown-plan` + `burndown-implement` | Burn down a batch of GitHub issues. `plan` recons in parallel and writes clarifying-question files; answer them offline, then `implement` ships one worktree + one PR per issue. |
 | `burndown-ship` | Fully autonomous burndown pipeline: implement → vet → route per PR (clean = done, iffy = address feedback, red = review + address feedback). One command, walk away. Resumable. |
 | `one-shot` | Carry a single task from a bare description to a merge-ready (or merged) PR: recon, plan, TDD implement, PR, CI green. Optional issue creation, review-and-fix, and merge. |
+| `autopilot` | Resolve one or more GitHub issues with no human in the loop: triage, decide every reversible ambiguity, one-shot, vet, review-and-fix when flagged, CI green, optional merge. Stops only for decisions that are visible, unprecedented, and expensive to reverse, and posts those as questions on the issue. |
 | `skill-converter` | Import an external skill and rewrite it as an oddkit skill (minimal, concise, no ceremony or AI fluff). |
 | `update` | Pull the latest oddkit from GitHub and refresh the local cache. |
 
@@ -106,6 +107,7 @@ claude plugin install oddkit@oddkit
 | `--create-issue` | Opens a GitHub issue first and uses it as the spec. Uses a project-local `create-issue` skill if one exists. | off |
 | `--with-review` | Runs `/oddkit:review-and-fix` on the PR before the CI gate. | off |
 | `--yolo` | Squash-merges the PR once CI is green and deletes the branch. | off |
+| `--unattended` | On an emergency, posts a comment on the issue and stops instead of asking in the terminal. Set by `/oddkit:autopilot`. | off |
 
 Each flag is also inferred from the description, so plain language works: "open an issue for this" turns on `--create-issue`, "review it" turns on `--with-review`, "ship it" or "merge it" turns on `--yolo`. The base branch is detected from `origin/HEAD`.
 
@@ -115,6 +117,20 @@ Each flag is also inferred from the description, so plain language works: "open 
 /oddkit:one-shot add a --json flag to the CLI --create-issue --with-review --yolo
 /oddkit:one-shot build the CSV export and merge it once CI is green
 ```
+
+**`autopilot`** — Hand over GitHub issues and walk away. Per issue: read the whole thread, recon, write a one-sentence definition of done, decide every ambiguity that is reversible or has precedent, post a brief with those decisions (only when it decided something), then `one-shot`, a vet pass in a fresh agent, `review-and-fix` only if the vet flags something, CI green, and with `--yolo` a merge. It asks nothing in the terminal. It stops for a human only when a decision is visible outside the code, has no precedent in the thread or codebase, and is expensive to reverse; then it posts multiple-choice questions on the issue (and writes `burndown-plan` files) and ends. Answer in the thread and re-run. Several issues run in parallel; merges are serialized in input order.
+
+| Argument | What it does | Default |
+|----------|-------------|---------|
+| `<#issue ...>` | One or more issue numbers or URLs. Required. | — |
+| `--yolo` | Merge each PR that is merge-ready: vet clean or review says Ready to merge, CI green, no manual step pending. | off |
+
+```
+/oddkit:autopilot #42
+/oddkit:autopilot #42 #57 #61 --yolo
+```
+
+Uses a project's own `create-issue`, `enrich-issue`, and `sync-issues` skills when they exist and accept `--yolo`; otherwise falls back to built-in equivalents.
 
 **`skill-converter`** — Convert external skills into oddkit skills. Analyzes methodology, asks just enough to gauge intent, produces a compact skill.
 
