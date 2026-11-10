@@ -28,19 +28,85 @@ claude plugin install oddkit@oddkit
 
 | Skill | What it does |
 |-------|-------------|
+| `autopilot` | Resolve one or more GitHub issues with no human in the loop: triage, decide every reversible ambiguity, one-shot, vet, review-and-fix when flagged, CI green, optional merge. Stops only for decisions that are visible, unprecedented, and expensive to reverse, and posts those as questions on the issue. |
+| `one-shot` | Carry a single task from a bare description to a merge-ready (or merged) PR: recon, plan, TDD implement, PR, CI green. Optional issue creation, review-and-fix, and merge. |
+| `burndown-plan` + `burndown-implement` | Burn down a batch of GitHub issues. `plan` recons in parallel and writes clarifying-question files; answer them offline, then `implement` ships one worktree + one PR per issue. |
+| `burndown-ship` | Fully autonomous burndown pipeline: implement → vet → route per PR (clean = done, iffy = address feedback, red = review + address feedback). One command, walk away. Resumable. |
+| `plan` | Build an implementation plan through recon, Q&A, and stress-testing. |
+| `implement` | Execute a plan phase by phase with compliance checks and verification. |
 | `review` | Review code, plans, or PRs from local or remote branches. Auto-detects content type. Capable of autonomously posting reviews on GitHub. |
 | `vet-prs` | Fast triage gate across a batch of open PRs. One Sonnet agent per PR grades scope, intent, and smell. Posts a short comment on each PR. Use before deep review when you have a pile. |
 | `address-feedback` | Address PR review comments: fetch, evaluate, fix, and respond autonomously. |
-| `plan` | Build an implementation plan through recon, Q&A, and stress-testing. |
-| `implement` | Execute a plan phase by phase with compliance checks and verification. |
-| `burndown-plan` + `burndown-implement` | Burn down a batch of GitHub issues. `plan` recons in parallel and writes clarifying-question files; answer them offline, then `implement` ships one worktree + one PR per issue. |
-| `burndown-ship` | Fully autonomous burndown pipeline: implement → vet → route per PR (clean = done, iffy = address feedback, red = review + address feedback). One command, walk away. Resumable. |
-| `one-shot` | Carry a single task from a bare description to a merge-ready (or merged) PR: recon, plan, TDD implement, PR, CI green. Optional issue creation, review-and-fix, and merge. |
-| `autopilot` | Resolve one or more GitHub issues with no human in the loop: triage, decide every reversible ambiguity, one-shot, vet, review-and-fix when flagged, CI green, optional merge. Stops only for decisions that are visible, unprecedented, and expensive to reverse, and posts those as questions on the issue. |
 | `skill-converter` | Import an external skill and rewrite it as an oddkit skill (minimal, concise, no ceremony or AI fluff). |
 | `update` | Pull the latest oddkit from GitHub and refresh the local cache. |
 
 ## Skill Details
+
+**`autopilot`** — Hand over GitHub issues and walk away. Per issue: read the whole thread, recon, write a one-sentence definition of done, decide every ambiguity that is reversible or has precedent, post a brief with those decisions (only when it decided something), then `one-shot`, a vet pass in a fresh agent, `review-and-fix` only if the vet flags something, CI green, and with `--yolo` a merge. It asks nothing in the terminal. It stops for a human only when a decision is visible outside the code, has no precedent in the thread or codebase, and is expensive to reverse; then it posts multiple-choice questions on the issue (and writes `burndown-plan` files) and ends. Answer in the thread and re-run. Several issues run in parallel; merges are serialized in input order.
+
+| Argument | What it does | Default |
+|----------|-------------|---------|
+| `<#issue ...>` | One or more issue numbers or URLs. Required. | — |
+| `--yolo` | Merge each PR that is merge-ready: vet clean or review says Ready to merge, CI green, no manual step pending. | off |
+
+```
+/oddkit:autopilot #42
+/oddkit:autopilot #42 #57 #61 --yolo
+```
+
+Uses a project's own `create-issue`, `enrich-issue`, and `sync-issues` skills when they exist and accept `--yolo`; otherwise falls back to built-in equivalents.
+
+**`one-shot`** — One task, end to end, in a single autonomous run: optional issue → recon → plan → implement with TDD → PR → optional review-and-fix → CI green → optional merge. It asks nothing unless it hits a real emergency (breaking regressions, an XL refactor, or work that runs against the app's intent).
+
+| Argument | What it does | Default |
+|----------|-------------|---------|
+| `[task description]` | Free text, or `#N` / an issue URL to use an existing issue as the spec. Required. | — |
+| `--create-issue` | Opens a GitHub issue first and uses it as the spec. Uses a project-local `create-issue` skill if one exists. | off |
+| `--with-review` | Runs `/oddkit:review-and-fix` on the PR before the CI gate. | off |
+| `--yolo` | Squash-merges the PR once CI is green and deletes the branch. | off |
+| `--unattended` | On an emergency, posts a comment on the issue and stops instead of asking in the terminal. Set by `/oddkit:autopilot`. | off |
+
+Each flag is also inferred from the description, so plain language works: "open an issue for this" turns on `--create-issue`, "review it" turns on `--with-review`, "ship it" or "merge it" turns on `--yolo`. The base branch is detected from `origin/HEAD`.
+
+```
+/oddkit:one-shot fix the flaky retry logic in the sync worker
+/oddkit:one-shot #42 --with-review
+/oddkit:one-shot add a --json flag to the CLI --create-issue --with-review --yolo
+/oddkit:one-shot build the CSV export and merge it once CI is green
+```
+
+**`burndown-plan` + `burndown-implement`** — Burn down a batch of GitHub issues async. Run `plan` first to recon and produce per-issue clarifying-question files. Answer them in your editor. Run `implement` to ship: one worktree per issue, one PR per issue, no realtime questions. State lives in `.oddkit/` (gitignored, branch-independent). Fully resumable.
+
+```
+/oddkit:burndown-plan #123 #456 #789
+  → answer questions in .oddkit/burndown-clarifying-questions/<n>.md
+/oddkit:burndown-implement
+```
+
+```
+/oddkit:burndown-plan --base develop #123 #456   # override the base branch
+```
+
+**`burndown-ship`** — End-to-end autonomous shipping for a planned burndown. Runs `burndown-implement`, vets every PR it just created, then routes each: clean PRs are done, iffy small/medium PRs go through `address-feedback`, red or large/iffy PRs go through `review` then `address-feedback`. Every sub-skill is invoked with `--yolo`. Resumable — state lives in each issue's existing tracking file. Use after answering clarifying questions when you want to ship hands-off.
+
+```
+/oddkit:burndown-ship
+```
+
+**`plan`** — Build an implementation plan: recon, Q&A, approach selection, stress-test, phased plan.
+
+```
+/oddkit:plan add caching to the API layer
+/oddkit:plan --out docs/plans/caching.plan.md
+```
+
+**`implement`** — Execute an implementation plan phase by phase with compliance checks and verification.
+
+```
+/oddkit:implement docs/plans/caching.plan.md
+/oddkit:implement docs/plans/caching.plan.md --yolo
+/oddkit:implement                              # auto-finds .plan.md files
+```
 
 **`review`** — Review code or plans. Auto-detects content type.
 
@@ -65,72 +131,6 @@ claude plugin install oddkit@oddkit
 /oddkit:address-feedback #42          # confirm before push/reply
 /oddkit:address-feedback #42 --yolo   # push and reply without asking
 ```
-
-**`plan`** — Build an implementation plan: recon, Q&A, approach selection, stress-test, phased plan.
-
-```
-/oddkit:plan add caching to the API layer
-/oddkit:plan --out docs/plans/caching.plan.md
-```
-
-**`implement`** — Execute an implementation plan phase by phase with compliance checks and verification.
-
-```
-/oddkit:implement docs/plans/caching.plan.md
-/oddkit:implement docs/plans/caching.plan.md --yolo
-/oddkit:implement                              # auto-finds .plan.md files
-```
-
-**`burndown-plan` + `burndown-implement`** — Burn down a batch of GitHub issues async. Run `plan` first to recon and produce per-issue clarifying-question files. Answer them in your editor. Run `implement` to ship: one worktree per issue, one PR per issue, no realtime questions. State lives in `.oddkit/` (gitignored, branch-independent). Fully resumable.
-
-```
-/oddkit:burndown-plan #123 #456 #789
-  → answer questions in .oddkit/burndown-clarifying-questions/<n>.md
-/oddkit:burndown-implement
-```
-
-```
-/oddkit:burndown-plan --base develop #123 #456   # override the base branch
-```
-
-**`burndown-ship`** — End-to-end autonomous shipping for a planned burndown. Runs `burndown-implement`, vets every PR it just created, then routes each: clean PRs are done, iffy small/medium PRs go through `address-feedback`, red or large/iffy PRs go through `review` then `address-feedback`. Every sub-skill is invoked with `--yolo`. Resumable — state lives in each issue's existing tracking file. Use after answering clarifying questions when you want to ship hands-off.
-
-```
-/oddkit:burndown-ship
-```
-
-**`one-shot`** — One task, end to end, in a single autonomous run: optional issue → recon → plan → implement with TDD → PR → optional review-and-fix → CI green → optional merge. It asks nothing unless it hits a real emergency (breaking regressions, an XL refactor, or work that runs against the app's intent).
-
-| Argument | What it does | Default |
-|----------|-------------|---------|
-| `[task description]` | Free text, or `#N` / an issue URL to use an existing issue as the spec. Required. | — |
-| `--create-issue` | Opens a GitHub issue first and uses it as the spec. Uses a project-local `create-issue` skill if one exists. | off |
-| `--with-review` | Runs `/oddkit:review-and-fix` on the PR before the CI gate. | off |
-| `--yolo` | Squash-merges the PR once CI is green and deletes the branch. | off |
-| `--unattended` | On an emergency, posts a comment on the issue and stops instead of asking in the terminal. Set by `/oddkit:autopilot`. | off |
-
-Each flag is also inferred from the description, so plain language works: "open an issue for this" turns on `--create-issue`, "review it" turns on `--with-review`, "ship it" or "merge it" turns on `--yolo`. The base branch is detected from `origin/HEAD`.
-
-```
-/oddkit:one-shot fix the flaky retry logic in the sync worker
-/oddkit:one-shot #42 --with-review
-/oddkit:one-shot add a --json flag to the CLI --create-issue --with-review --yolo
-/oddkit:one-shot build the CSV export and merge it once CI is green
-```
-
-**`autopilot`** — Hand over GitHub issues and walk away. Per issue: read the whole thread, recon, write a one-sentence definition of done, decide every ambiguity that is reversible or has precedent, post a brief with those decisions (only when it decided something), then `one-shot`, a vet pass in a fresh agent, `review-and-fix` only if the vet flags something, CI green, and with `--yolo` a merge. It asks nothing in the terminal. It stops for a human only when a decision is visible outside the code, has no precedent in the thread or codebase, and is expensive to reverse; then it posts multiple-choice questions on the issue (and writes `burndown-plan` files) and ends. Answer in the thread and re-run. Several issues run in parallel; merges are serialized in input order.
-
-| Argument | What it does | Default |
-|----------|-------------|---------|
-| `<#issue ...>` | One or more issue numbers or URLs. Required. | — |
-| `--yolo` | Merge each PR that is merge-ready: vet clean or review says Ready to merge, CI green, no manual step pending. | off |
-
-```
-/oddkit:autopilot #42
-/oddkit:autopilot #42 #57 #61 --yolo
-```
-
-Uses a project's own `create-issue`, `enrich-issue`, and `sync-issues` skills when they exist and accept `--yolo`; otherwise falls back to built-in equivalents.
 
 **`skill-converter`** — Convert external skills into oddkit skills. Analyzes methodology, asks just enough to gauge intent, produces a compact skill.
 
